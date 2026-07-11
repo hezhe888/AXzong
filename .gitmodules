@@ -1,0 +1,3 @@
+[submodule "jack_Revenue_daily"]
+	path = jack_Revenue_daily
+	url = https://github.com/hezhe888/jk-revenue-daily.git
