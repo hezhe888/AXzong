@@ -44,13 +44,13 @@ DB_CONFIG = {
 MAX_RETRIES = 3
 
 
-def load_jk_mids():
+def load_pub_mapping():
     raw = os.environ['PUB_MAPPING']
     mapping = json.loads(raw)
     jk_mids = [k for k, v in mapping.items() if 'jk' in v.lower()]
     if not jk_mids:
         raise ValueError("No JK pubs found in PUB_MAPPING")
-    return jk_mids
+    return mapping, jk_mids
 
 
 def get_yesterday_date():
@@ -82,7 +82,7 @@ def send_feishu(text):
 
 
 def fetch_jk_report(date_str):
-    jk_mids = load_jk_mids()
+    mapping, jk_mids = load_pub_mapping()
     conn = pymysql.connect(**DB_CONFIG)
     cursor = conn.cursor()
     placeholders = ','.join(['%s'] * len(jk_mids))
@@ -106,12 +106,21 @@ def fetch_jk_report(date_str):
     cursor.execute(sql_detail, jk_mids + [date_str])
     details = cursor.fetchall()
 
+    sql_unknown = '''
+    SELECT DISTINCT mid
+    FROM offerplus_detail_report
+    WHERE date = %s AND revenue > 0
+    '''
+    cursor.execute(sql_unknown, [date_str])
+    all_mids = set(str(row[0]) for row in cursor.fetchall())
+    unknown_mids = [m for m in all_mids if m not in mapping]
+
     cursor.close()
     conn.close()
-    return total_rev, details
+    return total_rev, details, unknown_mids
 
 
-def build_message(date_str, total_rev, details):
+def build_message(date_str, total_rev, details, unknown_mids):
     beijing = timezone(timedelta(hours=8))
     now_beijing = datetime.now(beijing)
     date_display = f"{date_str[:4]}年{int(date_str[4:6])}月{int(date_str[6:])}日"
@@ -125,6 +134,14 @@ def build_message(date_str, total_rev, details):
             lines.append(f"{d[0]} {d[1]} {d[2]}---{d[3]}")
     else:
         lines.append("（当天无Revenue数据）")
+
+    if unknown_mids:
+        lines.append("")
+        lines.append("---")
+        lines.append(f"⚠️ 发现 {len(unknown_mids)} 个未知 pub（不在 PUB_MAPPING 中）：")
+        for m in unknown_mids:
+            lines.append(f"  mid={m}")
+        lines.append("请确认 pub name 后更新 Secret → PUB_MAPPING")
 
     lines.append("")
     lines.append(f"推送时间：{now_beijing.strftime('%Y-%m-%d %H:%M:%S')} (北京时间)")
@@ -147,14 +164,14 @@ def main():
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            total_rev, details = fetch_jk_report(date_str)
+            total_rev, details, unknown_mids = fetch_jk_report(date_str)
 
             if attempt == 1:
                 pass
             else:
                 print(f"Retry {attempt} succeeded")
 
-            message = build_message(date_str, total_rev, details)
+            message = build_message(date_str, total_rev, details, unknown_mids)
             result = send_feishu(message)
             print(f"Sent successfully: {result}")
             return
