@@ -29,6 +29,6 @@ jobs:
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_NAME: ${{ secrets.DB_NAME }}
-          JK_MIDS: ${{ secrets.JK_MIDS }}
-          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+          PUB_MAPPING: ${{ secrets.PUB_MAPPING }}
+          FEISHU_WEBHOOK: "https://open.feishu.cn/open-apis/bot/v2/hook/3e825272-d3a9-4f3b-b16f-fff6e8bd4f81"
           FEISHU_WEBHOOK_2: ${{ secrets.FEISHU_WEBHOOK_2 }}

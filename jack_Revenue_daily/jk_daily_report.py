@@ -33,11 +33,11 @@ def _load_webhooks():
 WEBHOOK_URLS = _load_webhooks()
 
 DB_CONFIG = {
-    'host': os.environ.get('DB_HOST', '116.204.109.33'),
-    'port': int(os.environ.get('DB_PORT', '34000')),
-    'user': os.environ.get('DB_USER', 'affiliate'),
+    'host': os.environ['DB_HOST'],
+    'port': int(os.environ['DB_PORT']),
+    'user': os.environ['DB_USER'],
     'password': os.environ['DB_PASSWORD'],
-    'database': os.environ.get('DB_NAME', 'affiliate'),
+    'database': os.environ['DB_NAME'],
     'charset': 'utf8mb4',
 }
 
@@ -45,10 +45,11 @@ MAX_RETRIES = 3
 
 
 def load_jk_mids():
-    raw = os.environ.get('JK_MIDS', '')
-    jk_mids = [m.strip() for m in raw.split(',') if m.strip()]
+    raw = os.environ['PUB_MAPPING']
+    mapping = json.loads(raw)
+    jk_mids = [k for k, v in mapping.items() if 'jk' in v.lower()]
     if not jk_mids:
-        raise ValueError("No JK_MIDS configured")
+        raise ValueError("No JK pubs found in PUB_MAPPING")
     return jk_mids
 
 
