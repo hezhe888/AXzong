@@ -127,12 +127,11 @@ def fetch_reject_records(dates):
         if mid not in pub_mapping and mid != '-':
             unknown_mids.add(mid)
 
-        if conv == 0 and reject > 0:
-            rate = 1.0
-        elif conv == 0:
+        total = reject + conv
+        if total == 0:
             rate = 0
         else:
-            rate = reject / conv
+            rate = reject / total
 
         if rate > REJECT_RATE_THRESHOLD:
             records.append((date_str, oid, pkg, country, pub_name, conv, reject, rate))
