@@ -63,8 +63,9 @@ def get_dates(args):
         return [args[0]]
     beijing = timezone(timedelta(hours=8))
     now_beijing = datetime.now(beijing)
+    today = now_beijing.strftime('%Y%m%d')
     yesterday = (now_beijing - timedelta(days=1)).strftime('%Y%m%d')
-    return [yesterday]
+    return [yesterday, today]
 
 
 def send_feishu(text):
