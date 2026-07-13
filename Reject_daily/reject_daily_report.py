@@ -2,7 +2,7 @@
 Reject Rate Daily Alert
 - Fetches reject data for adv id 130010 (1-2 days)
 - Alerts on reject_rate > 5%
-- Per-row detail with country breakdown
+- Per-row detail with country breakdown, table format
 - Pushes to Feishu webhook
 """
 
@@ -87,7 +87,6 @@ def fetch_reject_records(dates):
     cursor = conn.cursor()
 
     placeholders = ','.join(['%s'] * len(dates))
-    params = [ADV_ID] + dates + [REJECT_RATE_THRESHOLD]
 
     sql = f'''
     SELECT
@@ -104,29 +103,30 @@ def fetch_reject_records(dates):
     cursor.execute(sql, [ADV_ID] + dates)
     rows = cursor.fetchall()
 
-    results = []
+    records = []
     for row in rows:
         date_str = row[0]
         oid = row[1]
         pkg = row[2]
-        country = row[3]
+        country = row[3] or '-'
         reject = int(row[4]) if row[4] else 0
         conv = int(row[5]) if row[5] else 0
 
-        total = reject + conv
-        if total == 0:
+        if conv == 0 and reject > 0:
+            rate = 1.0
+        elif conv == 0:
             rate = 0
         else:
-            rate = reject / total
+            rate = reject / conv
 
         if rate > REJECT_RATE_THRESHOLD:
-            results.append((date_str, oid, pkg, country, reject, conv, rate))
+            records.append((date_str, oid, pkg, country, reject, conv, rate))
 
     cursor.close()
     conn.close()
 
-    results.sort(key=lambda x: (x[0], -x[4]))
-    return results
+    records.sort(key=lambda x: (x[0], -x[4]))
+    return records
 
 
 def build_message(dates, records):
@@ -150,41 +150,50 @@ def build_message(dates, records):
 
     if not records:
         lines.append(f"⚠️ 未发现拒绝率超过 {threshold_pct}% 的记录")
-    else:
-        date_counts = {}
-        total_records = len(records)
-        for d in dates:
-            date_counts[d] = len(by_date.get(d, []))
-        count_parts = ' / '.join(f"{d[4:6]}-{d[6:]}: {date_counts[d]}条" for d in dates if date_counts.get(d, 0) > 0)
-        lines.append(f"⚠️ 共发现 {total_records} 条异常记录（{count_parts}）")
+        lines.append("━" * 80)
+        lines.append(f"🕐 执行时间：{now_beijing.strftime('%Y-%m-%d %H:%M:%S')} CST")
+        return "\n".join(lines)
 
-    lines.append("━" * 30)
-    lines.append(f"\nPub: {ADV_NAME} ({ADV_ID})\n")
+    total_records = len(records)
+    date_counts = {}
+    for d in dates:
+        date_counts[d] = len(by_date.get(d, []))
+    count_parts = ' / '.join(
+        f"{d[4:6]}-{d[6:]}: {date_counts[d]}条"
+        for d in dates if date_counts.get(d, 0) > 0
+    )
+    lines.append(f"⚠️ 共发现 {total_records} 条异常记录（{count_parts}）")
+    lines.append("━" * 80)
+    lines.append("")
 
     for d in dates:
         if d not in by_date or not by_date[d]:
             continue
         day_records = by_date[d]
         date_display = f"{d[:4]}-{d[4:6]}-{d[6:]}"
+
+        lines.append(f"Pub: {ADV_NAME} ({ADV_ID})")
         lines.append(f"📅 {date_display}")
+        lines.append(f"{'Offer ID':<15} {'包名':<42} {'Geo':<12} {'Reject':>8} {'Conv':>8} {'RejectRate':>10}")
+        lines.append("-" * 100)
 
         unique_offers = set()
-        for i, r in enumerate(day_records):
-            is_last = (i == len(day_records) - 1)
-            prefix = "└─" if is_last else "├─"
+        for r in day_records:
             oid = r[1] or '-'
             pkg = r[2] or '-'
-            country = r[3] or '-'
+            country = r[3]
             reject = r[4]
             conv = r[5]
             rate = r[6]
-            lines.append(f"{prefix} Offer: {oid} ({pkg}) | 国家: {country} | Reject率: {rate:.1%} | 拒绝数: {reject} | 转化数: {conv}")
+            lines.append(f"{oid:<15} {pkg:<42} {country:<12} {reject:>8} {conv:>8} {rate:>9.2%}")
             unique_offers.add(oid)
 
+        lines.append("")
         offer_list = '|'.join(sorted(unique_offers, key=lambda x: str(x)))
-        lines.append(f"总计{len(day_records)}条 / {len(unique_offers)}个Offer：{offer_list}\n")
+        lines.append(f"总计{len(day_records)}条 / {len(unique_offers)}个Offer：{offer_list}")
+        lines.append("")
 
-    lines.append("━" * 30)
+    lines.append("━" * 80)
     lines.append(f"🕐 执行时间：{now_beijing.strftime('%Y-%m-%d %H:%M:%S')} CST")
     return "\n".join(lines)
 
