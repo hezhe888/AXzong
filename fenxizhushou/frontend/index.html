@@ -972,6 +972,72 @@ const ExclusionView = ({ data, filters, setFilters, onCopy }) => {
   );
 };
 
+const AdvTopView = ({ data, onCopy }) => {
+  const [filters, setF] = useState({ minRevenue: 5, minEcpc: 2, minCvr: 1, minClick: 100 });
+
+  const getAdvLabel = (src) => {
+    const name = advNameMap[String(src)];
+    return name ? `${src}-${name}` : String(src);
+  };
+
+  const advertiserGroups = useMemo(() => {
+    const advMap = {};
+    data.forEach(d => {
+      const adv = String(d['Advertiser ID'] || 'Unknown');
+      const oid = extractOfferId(d.Offer);
+      if (!advMap[adv]) advMap[adv] = { adv, totalRev: 0, offers: {} };
+      advMap[adv].totalRev += (Number(d.Revenue) || 0);
+      if (!advMap[adv].offers[oid]) {
+        advMap[adv].offers[oid] = { id: oid, rev: 0, payout: 0, click: 0, cbconv: 0, pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
+      }
+      advMap[adv].offers[oid].rev += (Number(d.Revenue) || 0);
+      advMap[adv].offers[oid].payout += (Number(d.Payout) || 0);
+      advMap[adv].offers[oid].click += (Number(d.Click) || 0);
+      advMap[adv].offers[oid].cbconv += (Number(d['Callback Conversion']) || 0);
+    });
+    return Object.values(advMap).map(a => {
+      const all = Object.values(a.offers).map(o => ({ ...o, ecpc: o.click > 0 ? ((o.payout / o.click) * 1000) : 0, cvr: o.click > 0 ? ((o.cbconv / o.click) * 100) : 0 }));
+      const filtered = all.filter(o => o.rev >= filters.minRevenue && o.ecpc >= filters.minEcpc && o.cvr >= filters.minCvr && o.click >= filters.minClick);
+      return { ...a, filteredOffers: filtered, topRevenue: [...filtered].sort((a, b) => b.rev - a.rev).slice(0, 20), topEcpc: [...filtered].sort((a, b) => b.ecpc - a.ecpc).slice(0, 20), topCvr: [...filtered].sort((a, b) => b.cvr - a.cvr).slice(0, 20) };
+    }).filter(a => a.filteredOffers.length > 0).sort((a, b) => b.totalRev - a.totalRev);
+  }, [data, filters]);
+
+  const copyIds = (items) => onCopy(items.map(o => o.id).join('|'));
+  const copyFmt = (items, type) => { const t = items.map(o => type === 'ecpc' ? `${o.id}|${o.pkg}|${o.geo} ecpc：${o.ecpc.toFixed(2)}` : type === 'cvr' ? `${o.id}|${o.pkg}|${o.geo} cvr：${o.cvr.toFixed(2)}%` : `${o.id}|${o.pkg}|${o.geo}`).join('\n'); copyToClipboard(t); onCopy(t); };
+
+  return (
+    <div className="space-y-8">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-end">
+        <span className="text-[11px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">adv-top 筛选</span>
+        <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最低 Revenue ($)</span><input type="number" step="any" value={filters.minRevenue} onChange={e => setF({...filters, minRevenue: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-indigo-500/20"/></div>
+        <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最低 eCPC</span><input type="number" step="any" value={filters.minEcpc} onChange={e => setF({...filters, minEcpc: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-indigo-500/20"/></div>
+        <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最低 CVR (%)</span><input type="number" step="any" value={filters.minCvr} onChange={e => setF({...filters, minCvr: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-indigo-500/20"/></div>
+        <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最低 Click</span><input type="number" step="any" value={filters.minClick} onChange={e => setF({...filters, minClick: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-indigo-500/20"/></div>
+      </div>
+      {advertiserGroups.map(adv => (
+        <div key={adv.adv} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6">
+          <div className="flex items-center gap-3 mb-4 border-l-4 border-indigo-600 pl-4"><h3 className="text-lg font-black text-slate-800">Advertiser: <span className="text-indigo-600">{getAdvLabel(adv.adv)}</span></h3></div>
+          <div className="flex items-center gap-2 mb-5 text-sm"><span className="font-bold text-slate-500">营收: <span className="text-slate-800">${adv.totalRev.toFixed(2)}</span></span><span className="text-slate-300">·</span><span className="text-slate-500">匹配 <span className="font-bold text-indigo-600">{adv.filteredOffers.length}</span> Offers</span></div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100">
+              <div className="flex justify-between items-center mb-3"><span className="text-xs font-bold text-indigo-600">Top Revenue</span><div className="flex gap-1.5"><button onClick={() => copyIds(adv.topRevenue)} className="bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold">ID</button><button onClick={() => copyFmt(adv.topRevenue)} className="bg-indigo-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">Fmt</button></div></div>
+              <div className="flex flex-wrap gap-1.5">{adv.topRevenue.map((o, i) => (<span key={i} className="bg-white border border-slate-200 text-slate-700 px-2 py-1 rounded-md text-[10px] font-mono font-bold">{o.id} <span className="text-indigo-500">${o.rev.toFixed(0)}</span></span>))}</div>
+            </div>
+            <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100">
+              <div className="flex justify-between items-center mb-3"><span className="text-xs font-bold text-rose-500 flex items-center gap-1"><I name="Flame" size={12}/> Top 20 eCPC</span><div className="flex gap-1.5"><button onClick={() => copyIds(adv.topEcpc)} className="bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold">ID</button><button onClick={() => copyFmt(adv.topEcpc, 'ecpc')} className="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">Fmt</button></div></div>
+              <div className="flex flex-wrap gap-1.5">{adv.topEcpc.map((o, i) => (<span key={i} className="bg-rose-50 border border-rose-100 text-rose-600 px-2 py-1 rounded-md text-[10px] font-mono font-bold">{o.id} <span className="text-rose-400">${o.ecpc.toFixed(2)}</span></span>))}</div>
+            </div>
+            <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100">
+              <div className="flex justify-between items-center mb-3"><span className="text-xs font-bold text-emerald-500 flex items-center gap-1"><I name="Diamond" size={12}/> Top 20 CVR</span><div className="flex gap-1.5"><button onClick={() => copyIds(adv.topCvr)} className="bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold">ID</button><button onClick={() => copyFmt(adv.topCvr, 'cvr')} className="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">Fmt</button></div></div>
+              <div className="flex flex-wrap gap-1.5">{adv.topCvr.map((o, i) => (<span key={i} className="bg-emerald-50 border border-emerald-100 text-emerald-600 px-2 py-1 rounded-md text-[10px] font-mono font-bold">{o.id} <span className="text-emerald-400">{o.cvr.toFixed(2)}%</span></span>))}</div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const RankingView = ({ data, onCopy }) => {
   const topOffers = useMemo(() => {
     const grouped = data.reduce((acc, d) => { const k = d.Offer || 'Unknown'; acc[k] = (acc[k] || 0) + (Number(d.Revenue) || 0); return acc; }, {});
@@ -1132,7 +1198,7 @@ function App() {
     loadData(from, to);
   };
 
-  const tabLabel = { dashboard: "总览看板", trend: "趋势分析", packageScout: "包名透视", anomaly: "异常监控", capWarning: "Cap预警", exclusion: "每日剔除", expansion: "拓量蓝海", ranking: "绩效排行" };
+  const tabLabel = { dashboard: "总览看板", trend: "趋势分析", packageScout: "包名透视", anomaly: "异常监控", capWarning: "Cap预警", exclusion: "每日剔除", expansion: "拓量蓝海", advtop: "adv-top", ranking: "绩效排行" };
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] text-slate-700 overflow-hidden font-sans">
@@ -1147,6 +1213,7 @@ function App() {
           <NavItem iconName="Bell" label="Cap预警" active={activeTab==='capWarning'} onClick={()=>setActiveTab('capWarning')}/>
           <NavItem iconName="FilterX" label="每日剔除" active={activeTab==='exclusion'} onClick={()=>setActiveTab('exclusion')}/>
           <NavItem iconName="Compass" label="拓量蓝海" active={activeTab==='expansion'} onClick={()=>setActiveTab('expansion')}/>
+          <NavItem iconName="Zap" label="adv-top" active={activeTab==='advtop'} onClick={()=>setActiveTab('advtop')}/>
           <NavItem iconName="Award" label="绩效排行" active={activeTab==='ranking'} onClick={()=>setActiveTab('ranking')}/>
         </nav>
         {lastRefresh && <div className="px-4 py-3 border-t text-[10px] text-slate-400 font-bold space-y-1"><div className="flex items-center gap-1.5"><I name="CheckCircle2" size={12} color="#10b981"/> 刷新: {lastRefresh.toLocaleTimeString()}</div>{latestData.latest_date && <div className="flex items-center gap-1.5"><I name="Calendar" size={12} color="#3b82f6"/> 数据至: {latestData.latest_date.slice(4,6)}月{latestData.latest_date.slice(6,8)}日 {latestData.latest_created ? latestData.latest_created.slice(11,19) : ''}</div>}</div>}
@@ -1182,6 +1249,7 @@ function App() {
               {activeTab === 'capWarning' && <CapWarningView data={rawData} onCopy={t => {copyToClipboard(t); showToast("预警ID已复制");}} />}
               {activeTab === 'exclusion' && <ExclusionView data={rawData} filters={filters} setFilters={setFilters} onCopy={t => {copyToClipboard(t); showToast("已复制名单");}} />}
               {activeTab === 'expansion' && <ExpansionView data={rawData} filters={filters} setFilters={setFilters} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
+              {activeTab === 'advtop' && <AdvTopView data={rawData} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
               {activeTab === 'ranking' && <RankingView data={rawData} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
             </>
           )}
