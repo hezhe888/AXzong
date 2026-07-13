@@ -205,7 +205,11 @@ def build_message(dates, records, unknown_mids):
             unique_offers.add(oid)
 
         lines.append("")
-        offer_list = '|'.join(sorted(unique_offers, key=lambda x: str(x)))
+        offer_reject = defaultdict(int)
+        for r in day_records:
+            offer_reject[r[1]] += r[6]
+        sorted_offers = sorted(unique_offers, key=lambda x: -offer_reject[x])
+        offer_list = '|'.join(str(o) for o in sorted_offers)
         lines.append(f"总计{len(day_records)}条 / {len(unique_offers)}个Offer：{offer_list}")
         lines.append("")
 
