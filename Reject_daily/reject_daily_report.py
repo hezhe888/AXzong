@@ -189,19 +189,19 @@ def build_message(dates, records, unknown_mids):
 
         lines.append(f"Pub: {ADV_NAME} ({ADV_ID})")
         lines.append(f"📅 {date_display}")
-        lines.append(f"{'Offer ID':<15} {'包名':<38} {'Geo':<6} {'渠道':<16} {'Conv':>6} {'Reject':>8} {'RejectRate':>10}")
-        lines.append("-" * 104)
 
         unique_offers = set()
-        for r in day_records:
+        for i, r in enumerate(day_records):
+            is_last = (i == len(day_records) - 1)
+            prefix = "└─" if is_last else "├─"
             oid = r[1] or '-'
-            pkg = (r[2] or '-')[:37]
+            pkg = r[2] or '-'
             country = r[3]
-            pub = (r[4] or '-')[:15]
+            pub = r[4] or '-'
             conv = r[5]
             reject = r[6]
             rate = r[7]
-            lines.append(f"{oid:<15} {pkg:<38} {country:<6} {pub:<16} {conv:>6} {reject:>8} {rate:>9.2%}")
+            lines.append(f"{prefix} Offer: {oid} ({pkg}) | 国家: {country} | 渠道: {pub} | Reject率: {rate:.1%} | 拒绝数: {reject} | 转化数: {conv}")
             unique_offers.add(oid)
 
         lines.append("")
