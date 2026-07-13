@@ -93,11 +93,12 @@ def fetch_reject_records(dates):
         date,
         adgroup_id,
         pkg_name,
-        adv_country,
-        reject,
-        conversion
+        COALESCE(adv_country, '-') as adv_country,
+        SUM(reject) as total_reject,
+        SUM(conversion) as total_conversion
     FROM offerplus_detail_report
     WHERE src = %s AND date IN ({placeholders}) AND reject > 0
+    GROUP BY date, adgroup_id, pkg_name, adv_country
     '''
 
     cursor.execute(sql, [ADV_ID] + dates)
