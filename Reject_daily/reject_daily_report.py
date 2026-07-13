@@ -52,7 +52,7 @@ COLS = [
     ("Offer ID", 10, 'L'),
     ("包名", 22, 'L'),
     ("Geo", 6, 'L'),
-    ("渠道", 12, 'L'),
+    ("渠道", 18, 'L'),
     ("Conv", 6, 'R'),
     ("Reject", 6, 'R'),
     ("RejectRate", 10, 'R'),
@@ -158,7 +158,7 @@ def fetch_reject_records(dates):
         reject = int(row[5]) if row[5] else 0
         conv = int(row[6]) if row[6] else 0
 
-        pub_name = pub_mapping.get(mid, mid)
+        pub_name = f"{pub_mapping.get(mid, mid)}-{mid}"
         if mid not in pub_mapping and mid != '-':
             unknown_mids.add(mid)
 
@@ -179,7 +179,7 @@ def fetch_reject_records(dates):
 
 
 def _build_table(day_records):
-    sep = '-' * 78
+    sep = '-' * 84
     lines = []
 
     header_cols = [_cjk_pad(c[0], c[1], c[2]) for c in COLS]
@@ -190,7 +190,7 @@ def _build_table(day_records):
         oid = r[1] or '-'
         pkg = (r[2] or '-')[:22]
         country = r[3]
-        pub = (r[4] or '-')[:12]
+        pub = (r[4] or '-')[:18]
         conv = str(r[5])
         reject = str(r[6])
         rate = f"{r[7]:.2%}"
@@ -199,7 +199,7 @@ def _build_table(day_records):
             _cjk_pad(oid, 10, 'L'),
             _cjk_pad(pkg, 22, 'L'),
             _cjk_pad(country, 6, 'L'),
-            _cjk_pad(pub, 12, 'L'),
+            _cjk_pad(pub, 18, 'L'),
             _cjk_pad(conv, 6, 'R'),
             _cjk_pad(reject, 6, 'R'),
             _cjk_pad(rate, 10, 'R'),
