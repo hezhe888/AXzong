@@ -116,6 +116,20 @@ const fetchLatest = async () => {
   return res.json();
 };
 
+let pubNameMap = {};
+const fetchPubNames = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/api/pubnames`);
+    if (res.ok) pubNameMap = await res.json();
+  } catch(e) {}
+};
+const getPubLabel = (mid) => {
+  const m = String(mid);
+  if (m === 'jk-all') return 'JK综合';
+  const name = pubNameMap[m];
+  return name ? `${m}-${name}` : m;
+};
+
 /* ========== Components ========== */
 
 const NavItem = ({ iconName, label, active, onClick }) => (
@@ -459,7 +473,7 @@ const DashboardView = ({ data }) => {
       return row;
     });
     const dynamicColors = generateColors(topPubs.length);
-    const metricsConfig = topPubs.map((pub, i) => ({ key: pub, label: pub, color: dynamicColors[i] }));
+    const metricsConfig = topPubs.map((pub, i) => ({ key: pub, label: getPubLabel(pub), color: dynamicColors[i] }));
     return { data: chartRows, activeMetrics: topPubs, metricsConfig };
   }, [data]);
 
@@ -504,7 +518,7 @@ const TrendAnalysisView = ({ data }) => {
     return Array.from(unique).sort().map(v => ({ label: formatter(v), value: v }));
   }, [data]);
 
-  const pubOptions = getOptions('Pub ID');
+  const pubOptions = getOptions('Pub ID', s => getPubLabel(s));
   const advOptions = getOptions('Advertiser ID');
   const pkgOptions = getOptions('Package Name');
   const offerOptions = getOptions('Offer', extractOfferId);
@@ -606,7 +620,7 @@ const TrendAnalysisView = ({ data }) => {
         <div className="flex-1 min-h-0"><MultiTrendChart data={overviewChartData.data} activeMetrics={overviewChartData.activeMetrics} metricsConfig={overviewChartData.metricsConfig}/></div>
       </div>
       <div className="grid grid-cols-1 gap-8">
-        <ChartCard title="渠道趋势" iconName="ArrowRightLeft" chartData={prepareChartData('Pub ID', selectedPubs)} metric={activeMetrics[0]}/>
+        <ChartCard title="渠道趋势" iconName="ArrowRightLeft" chartData={prepareChartData('Pub ID', selectedPubs, s => getPubLabel(s))} metric={activeMetrics[0]}/>
         <ChartCard title="Offer 趋势" iconName="Target" chartData={prepareChartData('Offer', selectedOffers, extractOfferId)} metric={activeMetrics[0]}/>
         <ChartCard title="广告主趋势" iconName="Award" chartData={prepareChartData('Advertiser ID', selectedAdvs)} metric={activeMetrics[0]}/>
         <ChartCard title="包名趋势" iconName="Package" chartData={prepareChartData('Package Name', selectedPkgs)} metric={activeMetrics[0]}/>
@@ -789,7 +803,7 @@ const AnomalyView = ({ data, onCopy }) => {
       {Object.entries(anomalyGroups).map(([pub, items]) => (
         <div key={pub} className="bg-white rounded-2xl border overflow-hidden shadow-sm">
           <div className="px-6 py-4 bg-slate-50 border-b flex justify-between items-center">
-            <span className="font-bold text-xs uppercase text-slate-700">{pub} ({items.length} 个异常)</span>
+            <span className="font-bold text-xs uppercase text-slate-700">{getPubLabel(pub)} ({items.length} 个异常)</span>
             <div className="flex gap-2">
               <button onClick={() => onCopy(items.map(i => i.id).join('|'))} className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 border border-rose-100 rounded-lg text-[10px] font-bold text-rose-600 hover:bg-rose-100"><I name="Copy" size={12}/> 复制 IDs</button>
               <button onClick={() => onCopy(items.map(i => `${i.id}|${i.pkg}|${i.geo}`).join('\n'))} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-lg text-[10px] font-bold text-blue-600 hover:bg-blue-100"><I name="Copy" size={12}/> 复制格式</button>
@@ -1006,11 +1020,11 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
       </div>
       {recommendations.map(res => (
         <div key={res.pub} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6">
-          <div className="flex items-center gap-3 mb-6 border-l-4 border-blue-600 pl-4"><h3 className="text-lg font-black text-slate-800">Channel: <span className="text-blue-600">{res.pub}</span></h3></div>
+          <div className="flex items-center gap-3 mb-6 border-l-4 border-blue-600 pl-4"><h3 className="text-lg font-black text-slate-800">Channel: <span className="text-blue-600">{getPubLabel(res.pub)}</span></h3></div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-slate-50/50 rounded-xl p-5 border border-slate-100">
               <div className="flex justify-between items-center mb-4">
-                <h4 className="font-black text-slate-700 text-sm flex items-center gap-2"><I name="Compass" size={16} color="#3b82f6"/> 可向 {res.pub.split('-')[0]} 推荐 (NEW)</h4>
+                <h4 className="font-black text-slate-700 text-sm flex items-center gap-2"><I name="Compass" size={16} color="#3b82f6"/> 可向 {getPubLabel(res.pub)} 推荐 (NEW)</h4>
                 <div className="flex gap-2"><button onClick={() => copyIds(res.blueOcean)} className="bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-slate-50">复制 ID</button><button onClick={() => copyFormatted(res.blueOcean)} className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200">复制格式</button></div>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1062,7 +1076,13 @@ function App() {
     setError('');
     try {
       const rows = await fetchReport(from || dateFrom, to || dateTo);
-      setRawData(rows);
+      const jkMids = new Set(Object.entries(pubNameMap).filter(([m, n]) => String(n).toLowerCase().includes('jk')).map(([m]) => m));
+      if (jkMids.size > 0) {
+        const merged = rows.map(r => jkMids.has(String(r['Pub ID'])) ? { ...r, 'Pub ID': 'jk-all' } : r);
+        setRawData(merged);
+      } else {
+        setRawData(rows);
+      }
       setLastRefresh(new Date());
       fetchLatest().then(setLatestData);
     } catch (e) {
@@ -1072,7 +1092,7 @@ function App() {
     }
   }, [dateFrom, dateTo]);
 
-  useEffect(() => { loadData(); fetchLatest().then(setLatestData); }, []);
+  useEffect(() => { fetchPubNames().then(() => { loadData(); fetchLatest().then(setLatestData); }); }, []);
 
   useEffect(() => {
     const timer = setInterval(() => loadData(), 3600000);

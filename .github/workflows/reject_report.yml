@@ -30,5 +30,6 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_NAME: ${{ secrets.DB_NAME }}
           ADV_ID: '130010'
-          REJECT_RATE_THRESHOLD: '0.20'
+          ADV_NAME: 'Appnext-Click'
+          REJECT_RATE_THRESHOLD: '0.05'
           FEISHU_WEBHOOK: "https://open.feishu.cn/open-apis/bot/v2/hook/3e825272-d3a9-4f3b-b16f-fff6e8bd4f81"

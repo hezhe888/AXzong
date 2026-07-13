@@ -1,8 +1,8 @@
 """
-Reject Rate Daily Report
-- Fetches previous day's reject data for adv id 130010
-- Finds offers with reject_rate > 20%
-- Sorted by reject count descending
+Reject Rate Daily Alert
+- Fetches reject data for adv id 130010 (1-2 days)
+- Alerts on reject_rate > 5%
+- Per-row detail with country breakdown
 - Pushes to Feishu webhook
 """
 
@@ -13,6 +13,7 @@ import sys
 import traceback
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from collections import defaultdict
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -44,15 +45,20 @@ DB_CONFIG = {
 }
 
 ADV_ID = os.environ.get('ADV_ID', '130010')
-REJECT_RATE_THRESHOLD = float(os.environ.get('REJECT_RATE_THRESHOLD', '0.20'))
+ADV_NAME = os.environ.get('ADV_NAME', 'Appnext-Click')
+REJECT_RATE_THRESHOLD = float(os.environ.get('REJECT_RATE_THRESHOLD', '0.05'))
 MAX_RETRIES = 3
 
 
-def get_yesterday_date():
+def get_dates(args):
+    if len(args) >= 2:
+        return sorted(args[:2])
+    if len(args) == 1:
+        return [args[0]]
     beijing = timezone(timedelta(hours=8))
     now_beijing = datetime.now(beijing)
-    yesterday = now_beijing - timedelta(days=1)
-    return yesterday.strftime('%Y%m%d')
+    yesterday = (now_beijing - timedelta(days=1)).strftime('%Y%m%d')
+    return [yesterday]
 
 
 def send_feishu(text):
@@ -76,75 +82,111 @@ def send_feishu(text):
     return results
 
 
-def fetch_high_reject_offers(date_str):
+def fetch_reject_records(dates):
     conn = pymysql.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
-    sql = '''
+    placeholders = ','.join(['%s'] * len(dates))
+    params = [ADV_ID] + dates + [REJECT_RATE_THRESHOLD]
+
+    sql = f'''
     SELECT
+        date,
         adgroup_id,
         pkg_name,
-        SUM(reject) as total_reject,
-        SUM(conversion) as total_conversion,
-        ROUND(SUM(reject) * 1.0 / NULLIF(SUM(conversion), 0), 4) as reject_rate
+        adv_country,
+        reject,
+        conversion
     FROM offerplus_detail_report
-    WHERE src = %s AND date = %s
-    GROUP BY adgroup_id, pkg_name
-    HAVING reject_rate > %s AND total_reject > 0
-    ORDER BY total_reject DESC
+    WHERE src = %s AND date IN ({placeholders}) AND reject > 0
     '''
-    cursor.execute(sql, [ADV_ID, date_str, REJECT_RATE_THRESHOLD])
-    results = cursor.fetchall()
 
-    sql_overall = '''
-    SELECT
-        SUM(reject) as total_reject,
-        SUM(conversion) as total_conversion,
-        ROUND(SUM(reject) * 1.0 / NULLIF(SUM(conversion), 0), 4) as reject_rate
-    FROM offerplus_detail_report
-    WHERE src = %s AND date = %s
-    '''
-    cursor.execute(sql_overall, [ADV_ID, date_str])
-    overall = cursor.fetchone()
+    cursor.execute(sql, [ADV_ID] + dates)
+    rows = cursor.fetchall()
+
+    results = []
+    for row in rows:
+        date_str = row[0]
+        oid = row[1]
+        pkg = row[2]
+        country = row[3]
+        reject = int(row[4]) if row[4] else 0
+        conv = int(row[5]) if row[5] else 0
+
+        if conv == 0 and reject > 0:
+            rate = 1.0
+        elif conv == 0:
+            rate = 0
+        else:
+            rate = reject / conv
+
+        if rate > REJECT_RATE_THRESHOLD:
+            results.append((date_str, oid, pkg, country, reject, conv, rate))
 
     cursor.close()
     conn.close()
-    return results, overall
+
+    results.sort(key=lambda x: (x[0], -x[4]))
+    return results
 
 
-def build_message(date_str, offers, overall):
+def build_message(dates, records):
     beijing = timezone(timedelta(hours=8))
     now_beijing = datetime.now(beijing)
-    date_display = f"{date_str[:4]}年{int(date_str[4:6])}月{int(date_str[6:])}日"
+    threshold_pct = int(REJECT_RATE_THRESHOLD * 100)
 
-    overall_reject = int(overall[0]) if overall and overall[0] else 0
-    overall_conv = int(overall[1]) if overall and overall[1] else 0
-    overall_rate = float(overall[2]) if overall and overall[2] else 0
+    if len(dates) == 1:
+        date_range = f"{dates[0][:4]}-{dates[0][4:6]}-{dates[0][6:]}"
+    else:
+        date_range = f"{dates[0][:4]}-{dates[0][4:6]}-{dates[0][6:]} ~ {dates[1][:4]}-{dates[1][4:6]}-{dates[1][6:]}"
 
     lines = [
-        f"{date_display} Adv {ADV_ID} Reject 日报",
-        f"总体: Reject={overall_reject}  Conversion={overall_conv}  RejectRate={overall_rate:.2%}",
-        f"阈值: RejectRate > {REJECT_RATE_THRESHOLD:.0%}",
-        "",
+        f"{date_range} Reject拒绝率预警（reject_rate > {threshold_pct}%）",
+        f"📡 来源：{ADV_NAME}（{ADV_ID}）",
     ]
 
-    if offers:
-        lines.append(f"{'Offer ID':<15} {'包名':<50} {'Reject':>8} {'Conversion':>12} {'RejectRate':>10}")
-        lines.append("-" * 100)
-        for o in offers:
-            oid = o[0] or '-'
-            pkg = o[1] or '-'
-            rej = int(o[2]) if o[2] else 0
-            conv = int(o[3]) if o[3] else 0
-            rate = float(o[4]) if o[4] else 0
-            lines.append(f"{oid:<15} {pkg:<50} {rej:>8} {conv:>12} {rate:>9.2%}")
-        lines.append("")
-        lines.append(f"共 {len(offers)} 个 offer 超过阈值")
-    else:
-        lines.append("无超过阈值的 offer")
+    by_date = defaultdict(list)
+    for r in records:
+        by_date[r[0]].append(r)
 
-    lines.append("")
-    lines.append(f"推送时间: {now_beijing.strftime('%Y-%m-%d %H:%M:%S')} (北京时间)")
+    if not records:
+        lines.append(f"⚠️ 未发现拒绝率超过 {threshold_pct}% 的记录")
+    else:
+        date_counts = {}
+        total_records = len(records)
+        for d in dates:
+            date_counts[d] = len(by_date.get(d, []))
+        count_parts = ' / '.join(f"{d[4:6]}-{d[6:]}: {date_counts[d]}条" for d in dates if date_counts.get(d, 0) > 0)
+        lines.append(f"⚠️ 共发现 {total_records} 条异常记录（{count_parts}）")
+
+    lines.append("━" * 30)
+    lines.append(f"\nPub: {ADV_NAME} ({ADV_ID})\n")
+
+    for d in dates:
+        if d not in by_date or not by_date[d]:
+            continue
+        day_records = by_date[d]
+        date_display = f"{d[:4]}-{d[4:6]}-{d[6:]}"
+        lines.append(f"📅 {date_display}")
+
+        unique_offers = set()
+        for i, r in enumerate(day_records):
+            is_last = (i == len(day_records) - 1)
+            prefix = "└─" if is_last else "├─"
+            oid = r[1] or '-'
+            pkg = r[2] or '-'
+            country = r[3] or '-'
+            reject = r[4]
+            conv = r[5]
+            rate = r[6]
+            lines.append(f"{prefix} Offer: {oid} ({pkg}) | 国家: {country} | Reject率: {rate:.1%} | 拒绝数: {reject} | 转化数: {conv}")
+            unique_offers.add(oid)
+
+        offer_list = '|'.join(sorted(unique_offers, key=lambda x: str(x)))
+        lines.append(f"总计{len(day_records)}条 / {len(unique_offers)}个Offer：{offer_list}\n")
+
+    lines.append("━" * 30)
+    lines.append(f"🕐 执行时间：{now_beijing.strftime('%Y-%m-%d %H:%M:%S')} CST")
     return "\n".join(lines)
 
 
@@ -158,20 +200,15 @@ def send_error_alert(error_msg):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('date', nargs='?', help='Date in YYYYMMDD format (default: yesterday)')
+    parser.add_argument('dates', nargs='*', help='Date(s) in YYYYMMDD format (default: yesterday)')
     args = parser.parse_args()
-    date_str = args.date if args.date else get_yesterday_date()
+
+    dates = get_dates(args.dates)
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            offers, overall = fetch_high_reject_offers(date_str)
-
-            if attempt == 1:
-                pass
-            else:
-                print(f"Retry {attempt} succeeded")
-
-            message = build_message(date_str, offers, overall)
+            records = fetch_reject_records(dates)
+            message = build_message(dates, records)
             print(message)
             result = send_feishu(message)
             print(f"Sent successfully: {result}")
@@ -185,7 +222,7 @@ def main():
                 continue
 
             error_msg = (
-                f"日期: {date_str}\n"
+                f"日期: {dates}\n"
                 f"重试次数: {MAX_RETRIES}\n"
                 f"错误信息: {str(e)}\n\n"
                 f"详细堆栈:\n{error_detail}"

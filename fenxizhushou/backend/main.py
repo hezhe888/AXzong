@@ -1,5 +1,6 @@
 import os
 import re
+import json
 from pathlib import Path
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -116,6 +117,20 @@ def get_latest():
         "latest_date": row["latest_date"],
         "latest_created": str(row["latest_created"]) if row["latest_created"] else None,
     }
+
+@app.get("/api/pubnames")
+def get_pub_names():
+    mapping_str = os.environ.get("PUB_MAPPING", "")
+    if mapping_str:
+        try:
+            return json.loads(mapping_str)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    mapping_path = Path(__file__).resolve().parent.parent.parent / "pub_mapping.json"
+    if mapping_path.exists():
+        with open(mapping_path, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
 
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True))
