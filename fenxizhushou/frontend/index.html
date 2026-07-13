@@ -195,6 +195,8 @@ const DateRangePicker = ({ dateFrom, dateTo, onApply, onRefresh, loading }) => {
       </select>
     </div>
     <div className="flex gap-2">
+      <button onClick={() => onApply(dayOffset(0), dayOffset(0))} className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100">今天</button>
+      <button onClick={() => onApply(dayOffset(2), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近3天</button>
       <button onClick={() => onApply(dayOffset(6), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近7天</button>
       <button onClick={() => onApply(dayOffset(13), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近14天</button>
       <button onClick={() => onApply(dayOffset(29), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近30天</button>
