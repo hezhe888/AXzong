@@ -32,4 +32,5 @@ jobs:
           ADV_ID: '130010'
           ADV_NAME: 'Appnext-Click'
           REJECT_RATE_THRESHOLD: '0.05'
+          PUB_MAPPING: ${{ secrets.PUB_MAPPING }}
           FEISHU_WEBHOOK: "https://open.feishu.cn/open-apis/bot/v2/hook/3e825272-d3a9-4f3b-b16f-fff6e8bd4f81"

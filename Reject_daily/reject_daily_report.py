@@ -2,7 +2,7 @@
 Reject Rate Daily Alert
 - Fetches reject data for adv id 130010 (1-2 days)
 - Alerts on reject_rate > 5%
-- Per-row detail with country breakdown, table format
+- Per-row detail with mid/pub name, country breakdown, table format
 - Pushes to Feishu webhook
 """
 
@@ -50,6 +50,12 @@ REJECT_RATE_THRESHOLD = float(os.environ.get('REJECT_RATE_THRESHOLD', '0.05'))
 MAX_RETRIES = 3
 
 
+def load_pub_mapping():
+    if 'PUB_MAPPING' not in os.environ or not os.environ['PUB_MAPPING']:
+        return {}
+    return json.loads(os.environ['PUB_MAPPING'])
+
+
 def get_dates(args):
     if len(args) >= 2:
         return sorted(args[:2])
@@ -93,16 +99,19 @@ def fetch_reject_records(dates):
         date,
         adgroup_id,
         pkg_name,
-        COALESCE(adv_country, '-') as adv_country,
-        SUM(reject) as total_reject,
-        SUM(conversion) as total_conversion
+        COALESCE(adv_country, '-'),
+        mid,
+        reject,
+        conversion
     FROM offerplus_detail_report
     WHERE src = %s AND date IN ({placeholders}) AND reject > 0
-    GROUP BY date, adgroup_id, pkg_name, adv_country
     '''
 
     cursor.execute(sql, [ADV_ID] + dates)
     rows = cursor.fetchall()
+
+    pub_mapping = load_pub_mapping()
+    unknown_mids = set()
 
     records = []
     for row in rows:
@@ -110,8 +119,13 @@ def fetch_reject_records(dates):
         oid = row[1]
         pkg = row[2]
         country = row[3] or '-'
-        reject = int(row[4]) if row[4] else 0
-        conv = int(row[5]) if row[5] else 0
+        mid = str(row[4]) if row[4] else '-'
+        reject = int(row[5]) if row[5] else 0
+        conv = int(row[6]) if row[6] else 0
+
+        pub_name = pub_mapping.get(mid, mid)
+        if mid not in pub_mapping and mid != '-':
+            unknown_mids.add(mid)
 
         if conv == 0 and reject > 0:
             rate = 1.0
@@ -121,16 +135,16 @@ def fetch_reject_records(dates):
             rate = reject / conv
 
         if rate > REJECT_RATE_THRESHOLD:
-            records.append((date_str, oid, pkg, country, reject, conv, rate))
+            records.append((date_str, oid, pkg, country, pub_name, conv, reject, rate))
 
     cursor.close()
     conn.close()
 
-    records.sort(key=lambda x: (x[0], -x[4]))
-    return records
+    records.sort(key=lambda x: (x[0], -x[6]))
+    return records, unknown_mids
 
 
-def build_message(dates, records):
+def build_message(dates, records, unknown_mids):
     beijing = timezone(timedelta(hours=8))
     now_beijing = datetime.now(beijing)
     threshold_pct = int(REJECT_RATE_THRESHOLD * 100)
@@ -175,24 +189,29 @@ def build_message(dates, records):
 
         lines.append(f"Pub: {ADV_NAME} ({ADV_ID})")
         lines.append(f"📅 {date_display}")
-        lines.append(f"{'Offer ID':<15} {'包名':<42} {'Geo':<12} {'Reject':>8} {'Conv':>8} {'RejectRate':>10}")
-        lines.append("-" * 100)
+        lines.append(f"{'Offer ID':<15} {'包名':<38} {'Geo':<6} {'渠道':<16} {'Conv':>6} {'Reject':>8} {'RejectRate':>10}")
+        lines.append("-" * 104)
 
         unique_offers = set()
         for r in day_records:
             oid = r[1] or '-'
-            pkg = r[2] or '-'
+            pkg = (r[2] or '-')[:37]
             country = r[3]
-            reject = r[4]
+            pub = (r[4] or '-')[:15]
             conv = r[5]
-            rate = r[6]
-            lines.append(f"{oid:<15} {pkg:<42} {country:<12} {reject:>8} {conv:>8} {rate:>9.2%}")
+            reject = r[6]
+            rate = r[7]
+            lines.append(f"{oid:<15} {pkg:<38} {country:<6} {pub:<16} {conv:>6} {reject:>8} {rate:>9.2%}")
             unique_offers.add(oid)
 
         lines.append("")
         offer_list = '|'.join(sorted(unique_offers, key=lambda x: str(x)))
         lines.append(f"总计{len(day_records)}条 / {len(unique_offers)}个Offer：{offer_list}")
         lines.append("")
+
+    if unknown_mids:
+        lines.append("━" * 80)
+        lines.append(f"⚠️ 未知 mid（不在 PUB_MAPPING 中）：{', '.join(sorted(unknown_mids))}")
 
     lines.append("━" * 80)
     lines.append(f"🕐 执行时间：{now_beijing.strftime('%Y-%m-%d %H:%M:%S')} CST")
@@ -216,8 +235,8 @@ def main():
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            records = fetch_reject_records(dates)
-            message = build_message(dates, records)
+            records, unknown_mids = fetch_reject_records(dates)
+            message = build_message(dates, records, unknown_mids)
             print(message)
             result = send_feishu(message)
             print(f"Sent successfully: {result}")
