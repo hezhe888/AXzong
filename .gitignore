@@ -2,6 +2,7 @@
 *.env
 secrets.*
 credentials.*
+pub_mapping.json
 __pycache__/
 *.pyc
 .DS_Store

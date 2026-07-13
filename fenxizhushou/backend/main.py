@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import pymysql
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 load_dotenv()
 
@@ -20,13 +20,6 @@ app.add_middleware(
 )
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
-
-@app.get("/")
-async def serve_frontend():
-    index_path = FRONTEND_DIR / "index.html"
-    if index_path.exists():
-        return FileResponse(index_path)
-    return {"message": "Frontend not found"}
 
 def get_conn():
     return pymysql.connect(
@@ -53,7 +46,7 @@ def get_report(
     if not date_to:
         date_to = datetime.utcnow().strftime("%Y%m%d")
     if not date_from:
-        dt = datetime.strptime(date_to, "%Y%m%d") - timedelta(days=14)
+        dt = datetime.strptime(date_to, "%Y%m%d") - timedelta(days=7)
         date_from = dt.strftime("%Y%m%d")
 
     conn = get_conn()
@@ -62,7 +55,7 @@ def get_report(
             cur.execute(
                 """SELECT date, mid, src, adgroup_id, src_offer_id, pkg_name,
                           adv_country, revenue, payout, click, conversion,
-                          revenue_ecpc, cvr
+                          callback_conversion, revenue_ecpc, cvr
                    FROM offerplus_detail_report
                    WHERE date >= %s AND date <= %s
                    ORDER BY date DESC""",
@@ -87,6 +80,7 @@ def get_report(
             "Payout": float(r["payout"]) if r["payout"] is not None else 0,
             "Click": int(r["click"]) if r["click"] is not None else 0,
             "Conversion": int(r["conversion"]) if r["conversion"] is not None else 0,
+            "Callback Conversion": int(r["callback_conversion"]) if r["callback_conversion"] is not None else 0,
             "Revenue eCPC": float(r["revenue_ecpc"]) if r["revenue_ecpc"] is not None else 0,
             "CVR": float(r["cvr"]) if r["cvr"] is not None else 0,
             "OfferIdRaw": extract_offer_id(offer),
@@ -106,3 +100,22 @@ def get_dates():
     finally:
         conn.close()
     return [r["date"] for r in rows]
+
+@app.get("/api/latest")
+def get_latest():
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT MAX(date) as latest_date, MAX(created_at) as latest_created FROM offerplus_detail_report"
+            )
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    return {
+        "latest_date": row["latest_date"],
+        "latest_created": str(row["latest_created"]) if row["latest_created"] else None,
+    }
+
+if FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True))

@@ -4,18 +4,24 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>数据分析助手</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="tailwind.min.js"></script>
+<script src="react.min.js"></script>
+<script src="react-dom.min.js"></script>
+<script src="babel.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-  body { font-family: 'Inter', sans-serif; background: #F8FAFC; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #F8FAFC; }
   * { scrollbar-width: thin; scrollbar-color: #CBD5E1 transparent; }
   ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
 </style>
 </head>
-<body><div id="root"></div>
+<body>
+<div id="root" style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:sans-serif">
+  <div style="text-align:center;color:#94a3b8">
+    <div style="font-size:48px;margin-bottom:16px">&#9889;</div>
+    <div style="font-weight:bold">正在加载数据分析助手...</div>
+    <div id="diag-error" style="display:none;color:#ef4444;margin-top:12px;font-size:14px;max-width:600px;white-space:pre-wrap;text-align:left;background:#fef2f2;padding:16px;border-radius:8px"></div>
+  </div>
+</div>
 <script type="text/babel">
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -104,6 +110,12 @@ const fetchDates = async () => {
   return res.json();
 };
 
+const fetchLatest = async () => {
+  const res = await fetch(`${API_BASE}/api/latest`);
+  if (!res.ok) return { latest_date: '', latest_created: '' };
+  return res.json();
+};
+
 /* ========== Components ========== */
 
 const NavItem = ({ iconName, label, active, onClick }) => (
@@ -124,27 +136,38 @@ const StatCard = ({ title, value, iconName }) => (
   </div>
 );
 
-const DateRangePicker = ({ data, dateFrom, dateTo, onApply, onRefresh, loading }) => (
+const DateRangePicker = ({ dateFrom, dateTo, onApply, onRefresh, loading }) => {
+  const [availableDates, setAvailableDates] = useState([]);
+  useEffect(() => { fetchDates().then(setAvailableDates).catch(() => {}); }, []);
+  const formatLabel = (d) => {
+    if (!d || d.length < 8) return d;
+    const m = parseInt(d.slice(4,6)), day = parseInt(d.slice(6,8));
+    return `${m}月${day}日`;
+  };
+  return (
   <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-4 flex-wrap">
     <I name="Calendar" size={20} color="#3b82f6"/>
     <div className="flex items-center gap-2">
-      <input type="text" placeholder="YYYYMMDD" value={dateFrom} onChange={e => onApply(e.target.value, dateTo)}
-        className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold w-28 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"/>
+      <select value={dateFrom} onChange={e => onApply(e.target.value, dateTo)}
+        className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+        {availableDates.map(d => <option key={d} value={d}>{formatLabel(d)}</option>)}
+      </select>
       <span className="text-slate-400 font-bold">→</span>
-      <input type="text" placeholder="YYYYMMDD" value={dateTo} onChange={e => onApply(dateFrom, e.target.value)}
-        className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold w-28 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"/>
+      <select value={dateTo} onChange={e => onApply(dateFrom, e.target.value)}
+        className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+        {availableDates.map(d => <option key={d} value={d}>{formatLabel(d)}</option>)}
+      </select>
     </div>
     <div className="flex gap-2">
-      <button onClick={() => onApply(dayOffset(13), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近14天</button>
       <button onClick={() => onApply(dayOffset(6), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近7天</button>
+      <button onClick={() => onApply(dayOffset(13), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近14天</button>
       <button onClick={() => onApply(dayOffset(29), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近30天</button>
     </div>
     <button onClick={onRefresh} disabled={loading} className={`ml-auto px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${loading ? 'bg-slate-100 text-slate-400' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'}`}>
       <I name="RefreshCw" size={14} className={loading ? 'animate-spin' : ''}/> {loading ? '加载中...' : '刷新'}
     </button>
-    {data.length > 0 && <span className="text-[10px] font-bold text-slate-400">共 {data.length.toLocaleString()} 条数据</span>}
   </div>
-);
+)};
 
 const MultiSelect = ({ options, value = [], onChange, placeholder = "Select...", label }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -388,7 +411,7 @@ const MultiTrendChart = ({ data, activeMetrics, metricsConfig }) => {
 };
 
 const ChartCard = ({ title, iconName, chartData, metric }) => (
-  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[500px] w-full">
+  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col min-h-[450px] w-full">
     <div className="flex justify-between items-center mb-2 shrink-0">
       <h3 className="font-black text-slate-700 text-xs uppercase flex items-center gap-2">
         <I name={iconName} size={16}/> {title} <span className="text-slate-300">|</span> <span className="text-blue-500">{metric}</span>
@@ -441,14 +464,14 @@ const DashboardView = ({ data }) => {
   }, [data]);
 
   return (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div className="space-y-8 w-full flex flex-col" style={{minHeight: 'calc(100vh - 200px)'}}>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 shrink-0">
         <StatCard title="总营收" value={`$${stats.revenue.toLocaleString()}`} iconName="DollarSign"/>
         <StatCard title="总转化" value={stats.conv.toLocaleString()} iconName="CheckCircle2"/>
         <StatCard title="总点击" value={stats.clicks.toLocaleString()} iconName="ArrowRightLeft"/>
         <StatCard title="Offer 总数" value={stats.offers} iconName="Target"/>
       </div>
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[500px]">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col flex-1 min-h-0">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <I name="TrendingUp" size={18} color="#2563eb"/>
@@ -558,8 +581,8 @@ const TrendAnalysisView = ({ data }) => {
   }, [filteredData, activeMetrics]);
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-6">
+    <div className="space-y-6 w-full flex flex-col" style={{minHeight: 'calc(100vh - 200px)'}}>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-6 shrink-0">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
           <MultiSelect label="Advertiser (广告主)" options={advOptions} value={selectedAdvs} onChange={setSelectedAdvs} placeholder="全部广告主"/>
           <MultiSelect label="Publisher (渠道)" options={pubOptions} value={selectedPubs} onChange={setSelectedPubs} placeholder="全部渠道"/>
@@ -577,7 +600,7 @@ const TrendAnalysisView = ({ data }) => {
           })}
         </div>
       </div>
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-80">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col flex-1 min-h-0">
         <div className="flex items-center gap-2 mb-2"><I name="Activity" size={16}/> <h3 className="font-black text-slate-700 text-xs uppercase tracking-widest">综合趋势概览</h3></div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2">{overviewChartData.metricsConfig.map((cfg, i) => (<div key={i} className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: cfg.color }}></div><span className="text-[10px] font-bold text-slate-500">{cfg.label}</span></div>))}</div>
         <div className="flex-1 min-h-0"><MultiTrendChart data={overviewChartData.data} activeMetrics={overviewChartData.activeMetrics} metricsConfig={overviewChartData.metricsConfig}/></div>
@@ -606,7 +629,7 @@ const PackageScoutView = ({ data }) => {
   const advMetrics = useMemo(() => active ? Object.values(active.advertisers).map(adv => ({ ...adv, ecpc: adv.click > 0 ? (adv.rev / adv.click) * 1000 : 0, cvr: adv.click > 0 ? (adv.conv / adv.click) * 100 : 0 })) : [], [active]);
   if (packageGroups.length === 0) return <div className="h-96 flex flex-col items-center justify-center text-slate-400 gap-4"><I name="Package" size={48} className="opacity-20"/><p className="font-bold">暂无"多广告主竞争"的包名数据</p></div>;
   return (
-    <div className="flex h-[calc(100vh-140px)] gap-6">
+    <div className="flex h-[calc(100vh-210px)] gap-6">
       <div className="w-72 bg-white border border-slate-200 rounded-2xl flex flex-col shrink-0 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-100 bg-slate-50"><h3 className="font-black text-slate-700 text-xs uppercase flex items-center gap-2"><I name="List" size={14}/> 竞争包名 ({packageGroups.length})</h3>
           <div className="mt-3 relative"><I name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input type="text" placeholder="搜索包名..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-white border-none rounded-lg pl-9 pr-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-600"/></div></div>
@@ -736,7 +759,7 @@ const AnomalyView = ({ data, onCopy }) => {
   };
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-6 relative w-full" style={{minHeight: 'calc(100vh - 200px)'}}>
       <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col gap-4">
         <div className="flex justify-between items-center flex-wrap gap-4">
           <div><h3 className="font-black text-slate-800 flex items-center gap-2"><I name="AlertTriangle" size={20} color="#f43f5e"/> Payout 异常波动检测</h3></div>
@@ -894,7 +917,7 @@ const ExclusionView = ({ data, filters, setFilters, onCopy }) => {
   }, [data, filters]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full" style={{minHeight: 'calc(100vh - 200px)'}}>
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-8 items-center">
         <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最小点击数</span><input type="number" step="any" value={filters.minClicks} onChange={e => setFilters({...filters, minClicks: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
         <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最大 CVR %</span><input type="number" step="any" value={filters.maxCvr} onChange={e => setFilters({...filters, maxCvr: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
@@ -917,7 +940,7 @@ const RankingView = ({ data, onCopy }) => {
     return Object.entries(grouped).sort((a,b) => b[1] - a[1]).slice(0, 10);
   }, [data]);
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm max-w-2xl">
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm w-full" style={{minHeight: 'calc(100vh - 200px)'}}>
       <div className="p-6 border-b border-slate-100 flex justify-between items-center">
         <h3 className="font-black text-slate-800">绩效排行 (Top 10 Offers)</h3>
         <button onClick={() => onCopy(topOffers.map(o => extractOfferId(o[0])).join('|'))} className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md"><I name="Copy" size={14}/> 复制 IDs</button>
@@ -944,29 +967,40 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
       globalStats[oid].totalConv += (Number(d.Conversion) || 0);
       globalStats[oid].byPub[pubId] = true;
       if (!localStats[pubId]) localStats[pubId] = {};
-      if (!localStats[pubId][oid]) localStats[pubId][oid] = { id: oid, rev: 0, click: 0, conv: 0, pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
+      if (!localStats[pubId][oid]) localStats[pubId][oid] = { id: oid, rev: 0, payout: 0, click: 0, conv: 0, cbconv: 0, pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
       localStats[pubId][oid].rev += (Number(d.Revenue) || 0);
+      localStats[pubId][oid].payout += (Number(d.Payout) || 0);
       localStats[pubId][oid].click += (Number(d.Click) || 0);
       localStats[pubId][oid].conv += (Number(d.Conversion) || 0);
+      localStats[pubId][oid].cbconv += (Number(d['Callback Conversion']) || 0);
     });
     return pubs.map(pub => {
       const isSameAdv = (pS, aS) => { const cP = pS.replace(/^\d+-/, '').toLowerCase().trim(), cA = aS.replace(/^\d+-/, '').toLowerCase().trim(); return cP === cA || (cP.length > 2 && cA.length > 2 && (cP.includes(cA) || cA.includes(cP))); };
       const blueOcean = Object.values(globalStats).map(o => ({...o, cvr: o.totalClick > 0 ? (o.totalConv / o.totalClick) * 100 : 0, ecpc: o.totalClick > 0 ? o.totalRev / o.totalClick : 0})).filter(o => !o.byPub[pub] && !isSameAdv(pub, o.advertiserId) && (o.totalRev >= filters.minRevenue) && (o.totalConv >= filters.minConv)).sort((a,b)=>b.totalRev-a.totalRev);
-      const pubOffers = Object.values(localStats[pub]).map(o => ({...o, ecpc: o.click > 0 ? (o.rev/o.click) : 0, cvr: o.click > 0 ? (o.conv/o.click)*100 : 0}));
+      const pubOffers = Object.values(localStats[pub]).map(o => ({...o, ecpc: o.click > 0 ? ((o.payout/o.click)*1000) : 0, cvr: o.click > 0 ? ((o.cbconv/o.click)*100) : 0})).filter(o => o.payout >= filters.minPayout && o.ecpc >= filters.minEcpc && o.cvr >= filters.minCvr);
       return { pub, blueOcean, topEcpc: [...pubOffers].sort((a,b)=>b.ecpc-a.ecpc).slice(0, 20), topCvr: [...pubOffers].sort((a,b)=>b.cvr-a.cvr).slice(0, 20) };
     }).filter(r => r.blueOcean.length > 0 || r.topEcpc.length > 0);
   }, [data, filters]);
 
-  const copyFormatted = (items) => { const text = items.map(o => `${o.id}|${o.pkg}|${o.geo}`).join('\n'); copyToClipboard(text); onCopy(text); };
+  const copyFormatted = (items, type) => { const text = items.map(o => type === 'ecpc' ? `${o.id}|${o.pkg}|${o.geo} ecpc：${o.ecpc.toFixed(2)}` : type === 'cvr' ? `${o.id}|${o.pkg}|${o.geo} cvr：${o.cvr.toFixed(2)}%` : `${o.id}|${o.pkg}|${o.geo}`).join('\n'); copyToClipboard(text); onCopy(text); };
   const copyIds = (items) => onCopy(items.map(o => o.id).join('|'));
 
   return (
     <div className="space-y-8">
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-wrap gap-6 items-end shadow-sm">
-        <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最小营收 ($)</span><input type="number" step="any" value={filters.minRevenue} onChange={e => setFilters({...filters, minRevenue: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
-        <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最小转化数</span><input type="number" step="any" value={filters.minConv} onChange={e => setFilters({...filters, minConv: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+       <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-wrap gap-6 items-end shadow-sm">
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">推荐 offer</span>
+          <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最小营收 ($)</span><input type="number" step="any" value={filters.minRevenue} onChange={e => setFilters({...filters, minRevenue: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+          <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最小转化数</span><input type="number" step="any" value={filters.minConv} onChange={e => setFilters({...filters, minConv: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+        </div>
+        <div className="h-8 w-px bg-slate-200"></div>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">Top 20 eCPC / CVR</span>
+          <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最低 Payout ($)</span><input type="number" step="any" value={filters.minPayout} onChange={e => setFilters({...filters, minPayout: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-rose-500/20"/></div>
+          <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最低 eCPC</span><input type="number" step="any" value={filters.minEcpc} onChange={e => setFilters({...filters, minEcpc: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-rose-500/20"/></div>
+          <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最低 CVR (%)</span><input type="number" step="any" value={filters.minCvr} onChange={e => setFilters({...filters, minCvr: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-emerald-500/20"/></div>
+        </div>
         <div className="ml-auto flex items-center gap-4">
-          <span className="text-[10px] text-slate-400 font-bold">* 筛选仅针对蓝海拓量生效</span>
           <div className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2"><I name="Info" size={14}/> 共分析 {data.length} 条原始数据</div>
         </div>
       </div>
@@ -988,12 +1022,12 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
             <div className="space-y-6">
               <h4 className="font-black text-slate-700 text-sm flex items-center gap-2 mb-2"><I name="Zap" size={16} color="#f59e0b"/> 已有 OFFER 增量 (EXISTING)</h4>
               <div>
-                <div className="flex justify-between items-center mb-2"><span className="text-xs font-bold text-rose-500 flex items-center gap-1"><I name="Flame" size={12}/> Top 20 High eCPC</span><div className="flex gap-2"><button onClick={() => copyIds(res.topEcpc)} className="bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold">ID</button><button onClick={() => copyFormatted(res.topEcpc)} className="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">Format</button></div></div>
-                <div className="flex flex-wrap gap-1.5">{res.topEcpc.map((o, i) => (<span key={i} className="bg-rose-50 border border-rose-100 text-rose-600 px-2 py-1 rounded-md text-[10px] font-mono font-bold">{o.id}</span>))}</div>
+                <div className="flex justify-between items-center mb-2"><span className="text-xs font-bold text-rose-500 flex items-center gap-1"><I name="Flame" size={12}/> Top 20 High eCPC</span><div className="flex gap-2"><button onClick={() => copyIds(res.topEcpc)} className="bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold">ID</button><button onClick={() => copyFormatted(res.topEcpc, 'ecpc')} className="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">Format</button></div></div>
+                <div className="flex flex-wrap gap-1.5">{res.topEcpc.map((o, i) => (<span key={i} className="bg-rose-50 border border-rose-100 text-rose-600 px-2 py-1 rounded-md text-[10px] font-mono font-bold">{o.id} <span className="text-rose-400">${o.ecpc.toFixed(2)}</span></span>))}</div>
               </div>
               <div>
-                <div className="flex justify-between items-center mb-2"><span className="text-xs font-bold text-emerald-500 flex items-center gap-1"><I name="Diamond" size={12}/> Top 20 High CVR</span><div className="flex gap-2"><button onClick={() => copyIds(res.topCvr)} className="bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold">ID</button><button onClick={() => copyFormatted(res.topCvr)} className="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">Format</button></div></div>
-                <div className="flex flex-wrap gap-1.5">{res.topCvr.map((o, i) => (<span key={i} className="bg-emerald-50 border border-emerald-100 text-emerald-600 px-2 py-1 rounded-md text-[10px] font-mono font-bold">{o.id}</span>))}</div>
+                <div className="flex justify-between items-center mb-2"><span className="text-xs font-bold text-emerald-500 flex items-center gap-1"><I name="Diamond" size={12}/> Top 20 High CVR</span><div className="flex gap-2"><button onClick={() => copyIds(res.topCvr)} className="bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold">ID</button><button onClick={() => copyFormatted(res.topCvr, 'cvr')} className="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">Format</button></div></div>
+                <div className="flex flex-wrap gap-1.5">{res.topCvr.map((o, i) => (<span key={i} className="bg-emerald-50 border border-emerald-100 text-emerald-600 px-2 py-1 rounded-md text-[10px] font-mono font-bold">{o.id} <span className="text-emerald-400">{o.cvr.toFixed(2)}%</span></span>))}</div>
               </div>
             </div>
           </div>
@@ -1011,16 +1045,17 @@ const dayOffset = (n) => {
   return d.toISOString().slice(0, 10).replace(/-/g, '');
 };
 
-export default function App() {
+function App() {
   const [rawData, setRawData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [toast, setToast] = useState('');
-  const [dateFrom, setDateFrom] = useState(dayOffset(13));
+  const [dateFrom, setDateFrom] = useState(dayOffset(6));
   const [dateTo, setDateTo] = useState(dayOffset(0));
   const [lastRefresh, setLastRefresh] = useState(null);
-  const [filters, setFilters] = useState({ minRevenue: 5, minConv: 20, minClicks: 1000, maxCvr: 0.1, maxEcpc: 0.1, maxRevenue: 1 });
+  const [latestData, setLatestData] = useState({ latest_date: '', latest_created: '' });
+  const [filters, setFilters] = useState({ minRevenue: 5, minConv: 20, minClicks: 1000, maxCvr: 0.1, maxEcpc: 0.1, maxRevenue: 1, minPayout: 1, minEcpc: 1, minCvr: 1 });
 
   const loadData = useCallback(async (from, to) => {
     setLoading(true);
@@ -1029,6 +1064,7 @@ export default function App() {
       const rows = await fetchReport(from || dateFrom, to || dateTo);
       setRawData(rows);
       setLastRefresh(new Date());
+      fetchLatest().then(setLatestData);
     } catch (e) {
       setError('数据加载失败: ' + e.message);
     } finally {
@@ -1036,7 +1072,7 @@ export default function App() {
     }
   }, [dateFrom, dateTo]);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); fetchLatest().then(setLatestData); }, []);
 
   useEffect(() => {
     const timer = setInterval(() => loadData(), 3600000);
@@ -1056,7 +1092,7 @@ export default function App() {
   return (
     <div className="flex h-screen bg-[#F8FAFC] text-slate-700 overflow-hidden font-sans">
       {toast && (<div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-2"><I name="CheckCircle2" size={16} color="#34d399"/> <span className="text-sm font-bold">{toast}</span></div>)}
-      <div className="w-64 bg-white border-r flex flex-col shrink-0">
+      <div className="w-64 bg-white border-r flex flex-col shrink-0 fixed left-0 top-0 bottom-0 z-10">
         <div className="p-8 flex items-center gap-2 font-black text-2xl text-blue-600 italic">分析助手-zhe</div>
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
           <NavItem iconName="LayoutDashboard" label="总览看板" active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')}/>
@@ -1068,17 +1104,17 @@ export default function App() {
           <NavItem iconName="Compass" label="拓量蓝海" active={activeTab==='expansion'} onClick={()=>setActiveTab('expansion')}/>
           <NavItem iconName="Award" label="绩效排行" active={activeTab==='ranking'} onClick={()=>setActiveTab('ranking')}/>
         </nav>
-        {lastRefresh && <div className="px-4 py-3 border-t text-[10px] text-slate-400 font-bold flex items-center gap-1.5"><I name="CheckCircle2" size={12} color="#10b981"/> 最后刷新: {lastRefresh.toLocaleTimeString()}</div>}
+        {lastRefresh && <div className="px-4 py-3 border-t text-[10px] text-slate-400 font-bold space-y-1"><div className="flex items-center gap-1.5"><I name="CheckCircle2" size={12} color="#10b981"/> 刷新: {lastRefresh.toLocaleTimeString()}</div>{latestData.latest_date && <div className="flex items-center gap-1.5"><I name="Calendar" size={12} color="#3b82f6"/> 数据至: {latestData.latest_date.slice(4,6)}月{latestData.latest_date.slice(6,8)}日 {latestData.latest_created ? latestData.latest_created.slice(11,19) : ''}</div>}</div>}
       </div>
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden ml-64">
         <header className="h-16 px-8 flex items-center bg-white border-b shrink-0 justify-between">
           <h2 className="font-bold text-slate-800 text-lg uppercase tracking-widest">{tabLabel[activeTab]}</h2>
         </header>
         <div className="px-8 pt-4 shrink-0">
-          <DateRangePicker data={rawData} dateFrom={dateFrom} dateTo={dateTo} onApply={handleDateApply} onRefresh={() => loadData()} loading={loading}/>
+          <DateRangePicker dateFrom={dateFrom} dateTo={dateTo} onApply={handleDateApply} onRefresh={() => loadData()} loading={loading}/>
           {error && <div className="mt-2 text-rose-500 text-sm font-bold">{error}</div>}
         </div>
-        <main className="flex-1 overflow-y-auto p-8 pt-4">
+        <main className="flex-1 overflow-y-scroll p-8 pt-4">
           {loading && rawData.length === 0 ? (
             <div className="h-96 flex flex-col items-center justify-center text-slate-400 gap-4"><svg className="animate-spin h-10 w-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><p className="font-bold">正在加载数据...</p></div>
           ) : (
@@ -1099,7 +1135,16 @@ export default function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+try {
+  if (typeof React === 'undefined') throw new Error('React 未加载');
+  if (typeof ReactDOM === 'undefined') throw new Error('ReactDOM 未加载');
+  if (!ReactDOM.createRoot) throw new Error('ReactDOM.createRoot 不存在，请检查 React 版本(需18+)');
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(<App />);
+} catch(e) {
+  document.getElementById('root').innerHTML = '<div style="text-align:center;color:#ef4444;padding:40px"><h2 style="font-size:20px;font-weight:bold">&#10060; 加载失败</h2><pre style="margin-top:16px;font-size:13px;text-align:left;background:#fef2f2;padding:16px;border-radius:8px;max-width:700px;margin-left:auto;margin-right:auto;overflow:auto">'+e.message+'\n\n'+e.stack+'</pre></div>';
+  console.error(e);
+}
 </script>
 </body>
 </html>
