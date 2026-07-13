@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>数据分析助手</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  body { font-family: 'Inter', sans-serif; background: #F8FAFC; }
+  * { scrollbar-width: thin; scrollbar-color: #CBD5E1 transparent; }
+  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+</style>
+</head>
+<body><div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+const API_BASE = '';
+
+/* ========== SVG Icons ========== */
+const icons = {
+  LayoutDashboard:   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
+  Compass:           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>,
+  Award:             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>,
+  Upload:            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+  CheckCircle2:      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>,
+  ArrowRightLeft:    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>,
+  Target:            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+  Trash2:            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
+  Copy:              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>,
+  Calendar:          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
+  Loader2:           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>,
+  DollarSign:        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  FilterX:           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
+  List:              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>,
+  AlertTriangle:     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>,
+  ChevronRight:      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>,
+  TrendingUp:        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
+  LineChart:         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>,
+  Zap:               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+  Flame:             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>,
+  Diamond:           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.7 10.3a2.41 2.41 0 0 0 0 3.41l7.59 7.59a2.41 2.41 0 0 0 3.41 0l7.59-7.59a2.41 2.41 0 0 0 0-3.41l-7.59-7.59a2.41 2.41 0 0 0-3.41 0Z"/></svg>,
+  Info:              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="16" y2="12"/><line x1="12" x2="12.01" y1="8" y2="8"/></svg>,
+  Package:           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m16.5 9.4-9-5.19"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>,
+  Box:               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>,
+  Search:            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+  X:                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+  Activity:          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+  Check:             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  Maximize2:         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" x2="14" y1="3" y2="10"/><line x1="3" x2="10" y1="21" y2="14"/></svg>,
+  Bell:              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>,
+  RefreshCw:         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+};
+
+const I = ({ name, size, className, color }) => {
+  const el = icons[name];
+  if (!el) return null;
+  return React.cloneElement(el, { style: { width: size || el.props.width, height: size || el.props.height, color: color || 'currentColor' }, className });
+};
+
+/* ========== Utils ========== */
+const parseCSV = () => []; // 不再需要
+
+const copyToClipboard = (text) => {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+};
+
+const extractOfferId = (s) => {
+  if (!s) return "";
+  const m = String(s).match(/^(\d+)/);
+  return m ? m[1] : String(s);
+};
+
+const generateColors = (count) => {
+  const preset = ['#ef4444','#3b82f6','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#14b8a6','#6366f1','#eab308','#d946ef','#0ea5e9','#22c55e','#f43f5e','#a855f7','#1d4ed8','#b91c1c','#047857','#b45309','#4338ca','#be185d','#475569'];
+  const colors = [];
+  for (let i = 0; i < count; i++) {
+    if (i < preset.length) colors.push(preset[i]);
+    else colors.push(preset[i % preset.length] + 'B3');
+  }
+  return colors;
+};
+
+/* ========== API ========== */
+const fetchReport = async (dateFrom, dateTo) => {
+  const url = `${API_BASE}/api/report?date_from=${dateFrom}&date_to=${dateTo}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('API error');
+  return res.json();
+};
+
+const fetchDates = async () => {
+  const res = await fetch(`${API_BASE}/api/dates`);
+  if (!res.ok) return [];
+  return res.json();
+};
+
+/* ========== Components ========== */
+
+const NavItem = ({ iconName, label, active, onClick }) => (
+  <button onClick={onClick} className={`w-full flex items-center px-4 py-3 rounded-xl transition-all mb-1 ${active ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}>
+    <div className="flex items-center gap-3">
+      <I name={iconName} size={18}/> <span className="text-sm font-bold">{label}</span>
+    </div>
+  </button>
+);
+
+const StatCard = ({ title, value, iconName }) => (
+  <div className="bg-white p-6 rounded-2xl border border-slate-200">
+    <div className="flex items-center justify-between mb-2">
+      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{title}</span>
+      <I name={iconName} size={18} className="text-blue-500"/>
+    </div>
+    <div className="text-2xl font-black">{value}</div>
+  </div>
+);
+
+const DateRangePicker = ({ data, dateFrom, dateTo, onApply, onRefresh, loading }) => (
+  <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-4 flex-wrap">
+    <I name="Calendar" size={20} color="#3b82f6"/>
+    <div className="flex items-center gap-2">
+      <input type="text" placeholder="YYYYMMDD" value={dateFrom} onChange={e => onApply(e.target.value, dateTo)}
+        className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold w-28 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"/>
+      <span className="text-slate-400 font-bold">→</span>
+      <input type="text" placeholder="YYYYMMDD" value={dateTo} onChange={e => onApply(dateFrom, e.target.value)}
+        className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold w-28 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"/>
+    </div>
+    <div className="flex gap-2">
+      <button onClick={() => onApply(dayOffset(13), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近14天</button>
+      <button onClick={() => onApply(dayOffset(6), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近7天</button>
+      <button onClick={() => onApply(dayOffset(29), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近30天</button>
+    </div>
+    <button onClick={onRefresh} disabled={loading} className={`ml-auto px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${loading ? 'bg-slate-100 text-slate-400' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'}`}>
+      <I name="RefreshCw" size={14} className={loading ? 'animate-spin' : ''}/> {loading ? '加载中...' : '刷新'}
+    </button>
+    {data.length > 0 && <span className="text-[10px] font-bold text-slate-400">共 {data.length.toLocaleString()} 条数据</span>}
+  </div>
+);
+
+const MultiSelect = ({ options, value = [], onChange, placeholder = "Select...", label }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setIsOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    if (!search) return options.slice(0, 100);
+    return options.filter(o => String(o.label).toLowerCase().includes(search.toLowerCase())).slice(0, 100);
+  }, [options, search]);
+
+  const toggleOption = (val) => {
+    const newValue = value.includes(val) ? value.filter(v => v !== val) : [...value, val];
+    onChange(newValue);
+  };
+
+  const removeValue = (e, val) => {
+    e.stopPropagation();
+    onChange(value.filter(v => v !== val));
+  };
+
+  return (
+    <div className="relative w-full" ref={wrapperRef}>
+      {label && <label className="text-[10px] font-black text-slate-400 uppercase block mb-1">{label}</label>}
+      <div className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 min-h-[42px] flex items-center justify-between cursor-pointer hover:border-blue-500 transition-colors" onClick={() => setIsOpen(!isOpen)}>
+        <div className="flex flex-wrap gap-1 flex-1 overflow-hidden">
+          {value.length === 0 && <span className="text-slate-400 text-xs px-1">{placeholder}</span>}
+          {value.slice(0, 3).map(val => {
+              const labelText = options.find(o => o.value === val)?.label || val;
+              return (<span key={val} className="bg-white border border-slate-200 text-slate-700 text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 max-w-[100px] truncate"><span className="truncate">{labelText}</span><span className="cursor-pointer hover:text-rose-500 flex-shrink-0" onClick={(e) => removeValue(e, val)}><I name="X" size={10}/></span></span>);
+          })}
+          {value.length > 3 && <span className="bg-slate-200 text-slate-600 text-[10px] font-bold px-2 py-1 rounded-lg">+{value.length - 3}</span>}
+        </div>
+        <I name="ChevronRight" size={16} className={`text-slate-400 transition-transform shrink-0 ml-2 ${isOpen ? "rotate-90" : ""}`}/>
+      </div>
+      {isOpen && (
+        <div className="absolute top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+          <div className="p-2 border-b border-slate-50">
+            <div className="flex items-center gap-2 bg-slate-50 px-2 py-1.5 rounded-lg">
+              <I name="Search" size={14} className="text-slate-400"/>
+              <input autoFocus className="bg-transparent text-xs font-bold text-slate-700 outline-none w-full" placeholder="搜索..." value={search} onChange={(e) => setSearch(e.target.value)}/>
+              {search && <button onClick={() => setSearch('')}><I name="X" size={12} className="text-slate-400 hover:text-slate-600"/></button>}
+            </div>
+          </div>
+          <div className="max-h-60 overflow-y-auto p-1">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map(opt => {
+                const isSelected = value.includes(opt.value);
+                return (
+                  <button key={opt.value} onClick={() => toggleOption(opt.value)} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-colors flex items-center justify-between ${isSelected ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+                    <span className="truncate">{opt.label}</span>
+                    {isSelected && <I name="Check" size={14}/>}
+                  </button>
+                );
+              })
+            ) : <div className="px-3 py-4 text-center text-xs text-slate-400 font-medium">无匹配项</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SimpleBarChart = ({ data, dataKey, labelKey, color, unit = '', title }) => {
+  if (!data || data.length === 0) return <div className="text-slate-400 text-xs italic">无数据</div>;
+  const sortedData = [...data].sort((a, b) => b[dataKey] - a[dataKey]);
+  const maxValue = Math.max(...sortedData.map(d => d[dataKey])) || 1;
+  return (
+    <div className="space-y-3">
+      <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider flex items-center gap-2">{title}</h4>
+      <div className="space-y-2">
+        {sortedData.map((item, i) => {
+          const width = (item[dataKey] / maxValue) * 100;
+          return (
+            <div key={i} className="flex items-center gap-3 text-xs group">
+              <div className="w-24 text-right font-bold text-slate-600 truncate" title={item[labelKey]}>{item[labelKey].split('-')[0]}...</div>
+              <div className="flex-1 h-6 bg-slate-50 rounded-md overflow-hidden relative">
+                <div className="h-full rounded-md transition-all duration-500 ease-out flex items-center justify-end px-2" style={{ width: `${width}%`, backgroundColor: color }}>
+                  <span className="text-[10px] font-black text-white drop-shadow-md">{unit}{item[dataKey].toFixed(2)}{unit === '%' ? '%' : ''}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const MultiTrendChart = ({ data, activeMetrics, metricsConfig }) => {
+  const [hoverIndex, setHoverIndex] = useState(null);
+  const chartRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(1000);
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const ro = new ResizeObserver(entries => { for (let e of entries) setContainerWidth(e.contentRect.width); });
+    ro.observe(chartRef.current);
+    return () => ro.disconnect();
+  }, []);
+  if (!data || data.length < 2) return (
+    <div className="h-full min-h-[200px] flex flex-col items-center justify-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs gap-2">
+      <I name="LineChart" size={20} className="opacity-20"/><span>数据不足 (需2天+)</span>
+    </div>
+  );
+  const sortedData = [...data].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const width = containerWidth;
+  const height = 400;
+  const pL = 60, pR = 60, pT = 30, pB = 40;
+  const chartWidth = width - pL - pR;
+  const chartHeight = height - pT - pB;
+
+  const standardMetrics = ['Payout', 'Revenue', 'Click', 'Conversion', 'CVR', 'eCPC'];
+  const isMetricComparison = activeMetrics.length > 0 && activeMetrics.every(m => standardMetrics.includes(m));
+  let chartMode = 'single';
+  if (isMetricComparison) {
+    if (activeMetrics.length === 2) chartMode = 'dual';
+    else if (activeMetrics.length >= 3) chartMode = 'normalized';
+  } else chartMode = 'shared';
+
+  const maxValues = {};
+  let globalMax = -Infinity;
+  activeMetrics.forEach(key => {
+    const vals = sortedData.map(d => Number(d[key]) || 0);
+    let m = Math.max(...vals);
+    if (m <= 0) m = 10;
+    maxValues[key] = m;
+    globalMax = Math.max(globalMax, m);
+  });
+  if (globalMax <= 0) globalMax = 10;
+
+  const yTickRatios = [0, 0.25, 0.5, 0.75, 1];
+  const yTicks = yTickRatios.map(r => {
+    const y = height - pB - (r * chartHeight);
+    let leftLabel = '';
+    let rightLabel = '';
+    if (chartMode === 'normalized') leftLabel = `${(r * 100).toFixed(0)}%`;
+    else if (chartMode === 'dual') {
+      leftLabel = (maxValues[activeMetrics[0]] * r).toLocaleString(undefined, {maximumFractionDigits:0});
+      rightLabel = (maxValues[activeMetrics[1]] * r).toLocaleString(undefined, {maximumFractionDigits:0});
+    } else {
+      const currentMax = (chartMode === 'shared') ? globalMax : maxValues[activeMetrics[0]];
+      leftLabel = (currentMax * r).toLocaleString(undefined, {maximumFractionDigits:0});
+    }
+    return { y, leftLabel, rightLabel };
+  });
+
+  const paths = activeMetrics.map((key) => {
+    let currentMax;
+    if (chartMode === 'normalized') currentMax = maxValues[key];
+    else if (chartMode === 'dual') currentMax = maxValues[key];
+    else if (chartMode === 'shared') currentMax = globalMax;
+    else currentMax = maxValues[key];
+    const displayMax = currentMax * 1.05;
+    const points = sortedData.map((d, i) => {
+      const x = pL + (i * chartWidth / (sortedData.length - 1));
+      const val = Number(d[key]) || 0;
+      const normalizedVal = val / displayMax;
+      const y = height - pB - (normalizedVal * chartHeight);
+      return { x, y, raw: val };
+    });
+    return {
+      key,
+      pathD: points.length > 0 ? `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ') : "",
+      points,
+      color: metricsConfig.find(m => m.key === key)?.color || '#94a3b8'
+    };
+  });
+
+  const handleMouseMove = (e) => {
+    if (!chartRef.current) return;
+    const rect = chartRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const relativeX = x - pL;
+    const dynamicChartWidth = width - pL - pR;
+    let index = Math.round((relativeX / dynamicChartWidth) * (sortedData.length - 1));
+    index = Math.max(0, Math.min(index, sortedData.length - 1));
+    setHoverIndex(index);
+  };
+
+  return (
+    <div className="relative w-full h-full overflow-hidden select-none" onMouseMove={handleMouseMove} onMouseLeave={() => setHoverIndex(null)} ref={chartRef}>
+      {hoverIndex !== null && (
+        <div className="absolute z-10 bg-slate-900/95 backdrop-blur-sm text-white p-3 rounded-lg shadow-xl pointer-events-none border border-slate-700/50" style={{ left: 20, top: 20 }}>
+          <div className="text-[10px] font-black text-slate-400 mb-1 flex items-center gap-2"><I name="Calendar" size={10}/> {String(sortedData[hoverIndex].date).slice(4)}</div>
+          <div className="space-y-1">
+            {activeMetrics.map(key => {
+              const cfg = metricsConfig.find(m => m.key === key) || { label: key, color: '#94a3b8' };
+              const val = sortedData[hoverIndex][key];
+              let pctChange = null;
+              if (hoverIndex > 0) {
+                const prevVal = Number(sortedData[hoverIndex - 1][key]) || 0;
+                const currVal = Number(val) || 0;
+                if (prevVal !== 0) {
+                  const pct = ((currVal - prevVal) / prevVal) * 100;
+                  const isPositive = pct >= 0;
+                  pctChange = <span className={`ml-1.5 ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>{isPositive ? '+' : ''}{pct.toFixed(1)}%</span>;
+                }
+              }
+              return (
+                <div key={key} className="flex items-center gap-3 text-[10px]">
+                  <span className="flex items-center gap-1.5 font-bold truncate max-w-[120px]" style={{color: cfg.color}}><div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: cfg.color}}></div> {cfg.label}</span>
+                  <span className="font-mono font-bold ml-auto flex items-center">{Number(val).toLocaleString(undefined, {maximumFractionDigits: 2})}{pctChange}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full" preserveAspectRatio="none">
+        {yTicks.map((tick, i) => (
+          <g key={i}>
+            <line x1={pL} y1={tick.y} x2={width - pR} y2={tick.y} stroke="#F1F5F9" strokeWidth="1" strokeDasharray="4 4"/>
+            <text x={pL - 8} y={tick.y + 4} textAnchor="end" className="fill-slate-400 text-[10px] font-mono font-bold">{tick.leftLabel}</text>
+            {chartMode === 'dual' && tick.rightLabel && <text x={width - pR + 8} y={tick.y + 4} textAnchor="start" className="fill-slate-400 text-[10px] font-mono font-bold">{tick.rightLabel}</text>}
+          </g>
+        ))}
+        {paths.map(p => (
+          <g key={p.key}>
+            <path d={p.pathD} fill="none" stroke={p.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="drop-shadow-sm opacity-90"/>
+            {hoverIndex !== null && p.points[hoverIndex] && <circle cx={p.points[hoverIndex].x} cy={p.points[hoverIndex].y} r="4" fill={p.color} stroke="white" strokeWidth="2"/>}
+          </g>
+        ))}
+        {hoverIndex !== null && paths[0] && <line x1={paths[0].points[hoverIndex].x} y1={pT} x2={paths[0].points[hoverIndex].x} y2={height - pB} stroke="#94A3B8" strokeWidth="1" strokeDasharray="4 4"/>}
+        {sortedData.map((d, i) => {
+          const step = Math.ceil(sortedData.length / 8);
+          if (i === 0 || i === sortedData.length - 1 || i % step === 0) {
+            const x = pL + (i * chartWidth / (sortedData.length - 1));
+            return <text key={i} x={x} y={height - 10} textAnchor="middle" className="fill-slate-400 text-[10px] font-mono font-bold">{String(d.date).slice(4)}</text>;
+          }
+          return null;
+        })}
+      </svg>
+    </div>
+  );
+};
+
+const ChartCard = ({ title, iconName, chartData, metric }) => (
+  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[500px] w-full">
+    <div className="flex justify-between items-center mb-2 shrink-0">
+      <h3 className="font-black text-slate-700 text-xs uppercase flex items-center gap-2">
+        <I name={iconName} size={16}/> {title} <span className="text-slate-300">|</span> <span className="text-blue-500">{metric}</span>
+      </h3>
+    </div>
+    <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 h-8 overflow-hidden">
+      {chartData.metricsConfig.map((cfg, i) => (
+        <div key={i} className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: cfg.color }}></div><span className="text-[10px] font-bold text-slate-500 truncate max-w-[300px]" title={cfg.label}>{cfg.label}</span></div>
+      ))}
+    </div>
+    <div className="flex-1 w-full min-h-0">
+      <MultiTrendChart data={chartData.data} activeMetrics={chartData.activeMetrics} metricsConfig={chartData.metricsConfig}/>
+    </div>
+  </div>
+);
+
+/* ========== Views ========== */
+
+const DashboardView = ({ data }) => {
+  const stats = useMemo(() => ({
+    revenue: data.reduce((a, b) => a + (Number(b.Revenue) || 0), 0),
+    conv: data.reduce((a, b) => a + (Number(b.Conversion) || 0), 0),
+    clicks: data.reduce((a, b) => a + (Number(b.Click) || 0), 0),
+    offers: new Set(data.map(d => d.Offer)).size
+  }), [data]);
+
+  const channelData = useMemo(() => {
+    const dailyByPub = {};
+    const pubTotals = {};
+    const allDates = new Set();
+    data.forEach(d => {
+      const date = d.Date;
+      const pub = String(d['Pub ID'] || 'Unknown');
+      const rev = Number(d.Revenue) || 0;
+      allDates.add(date);
+      pubTotals[pub] = (pubTotals[pub] || 0) + rev;
+      if (!dailyByPub[date]) dailyByPub[date] = {};
+      dailyByPub[date][pub] = (dailyByPub[date][pub] || 0) + rev;
+    });
+    const topPubs = Object.entries(pubTotals).sort((a,b) => b[1] - a[1]).slice(0, 10).map(e => e[0]);
+    const sortedDates = Array.from(allDates).sort((a,b) => String(a).localeCompare(String(b)));
+    const chartRows = sortedDates.map(date => {
+      const row = { date };
+      topPubs.forEach(pub => row[pub] = dailyByPub[date]?.[pub] || 0);
+      return row;
+    });
+    const dynamicColors = generateColors(topPubs.length);
+    const metricsConfig = topPubs.map((pub, i) => ({ key: pub, label: pub, color: dynamicColors[i] }));
+    return { data: chartRows, activeMetrics: topPubs, metricsConfig };
+  }, [data]);
+
+  return (
+    <div className="space-y-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <StatCard title="总营收" value={`$${stats.revenue.toLocaleString()}`} iconName="DollarSign"/>
+        <StatCard title="总转化" value={stats.conv.toLocaleString()} iconName="CheckCircle2"/>
+        <StatCard title="总点击" value={stats.clicks.toLocaleString()} iconName="ArrowRightLeft"/>
+        <StatCard title="Offer 总数" value={stats.offers} iconName="Target"/>
+      </div>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[500px]">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <I name="TrendingUp" size={18} color="#2563eb"/>
+            <h3 className="font-black text-slate-800 text-sm uppercase tracking-widest">分渠道营收趋势</h3>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {channelData.metricsConfig.map(c => (
+              <div key={c.key} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500"><div className="w-2 h-2 rounded-full" style={{backgroundColor: c.color}}></div>{c.label}</div>
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 w-full min-h-0">
+          <MultiTrendChart data={channelData.data} activeMetrics={channelData.activeMetrics} metricsConfig={channelData.metricsConfig}/>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TrendAnalysisView = ({ data }) => {
+  const [selectedPubs, setSelectedPubs] = useState([]);
+  const [selectedAdvs, setSelectedAdvs] = useState([]);
+  const [selectedPkgs, setSelectedPkgs] = useState([]);
+  const [selectedOffers, setSelectedOffers] = useState([]);
+  const [activeMetrics, setActiveMetrics] = useState(['Payout']);
+  const metricOptions = ['Payout', 'Click', 'Conversion', 'CVR', 'eCPC'];
+
+  const getOptions = (key, formatter = s => s) => useMemo(() => {
+    const unique = new Set(data.map(d => d[key]).filter(Boolean));
+    return Array.from(unique).sort().map(v => ({ label: formatter(v), value: v }));
+  }, [data]);
+
+  const pubOptions = getOptions('Pub ID');
+  const advOptions = getOptions('Advertiser ID');
+  const pkgOptions = getOptions('Package Name');
+  const offerOptions = getOptions('Offer', extractOfferId);
+
+  const filteredData = useMemo(() => {
+    return data.filter(d => {
+      const matchPub = selectedPubs.length === 0 || selectedPubs.includes(d['Pub ID']);
+      const matchAdv = selectedAdvs.length === 0 || selectedAdvs.includes(d['Advertiser ID']);
+      const matchPkg = selectedPkgs.length === 0 || selectedPkgs.includes(d['Package Name']);
+      const matchOffer = selectedOffers.length === 0 || selectedOffers.includes(d['Offer']);
+      return matchPub && matchAdv && matchPkg && matchOffer;
+    });
+  }, [data, selectedPubs, selectedAdvs, selectedPkgs, selectedOffers]);
+
+  const toggleMetric = (key) => {
+    setActiveMetrics(prev => {
+      if (prev.includes(key)) { if (prev.length === 1) return prev; return prev.filter(k => k !== key); }
+      return [...prev, key];
+    });
+  };
+
+  const prepareChartData = (dimKey, selectedItems, labelFormatter = s => s) => {
+    const primaryMetric = activeMetrics[0] || 'Payout';
+    const grouped = {}; const allDates = new Set();
+    filteredData.forEach(d => {
+      const rawItem = d[dimKey] || 'Unknown';
+      const item = labelFormatter(rawItem);
+      const date = d.Date;
+      allDates.add(date);
+      const dataVal = primaryMetric === 'Payout' ? (d.Payout !== undefined ? d.Payout : d.Revenue) : d[primaryMetric];
+      const mainVal = Number(dataVal) || 0;
+      if (!grouped[rawItem]) grouped[rawItem] = { totalMainMetric: 0, byDate: {} };
+      grouped[rawItem].totalMainMetric += mainVal;
+      if (!grouped[rawItem].byDate[date]) grouped[rawItem].byDate[date] = {};
+      grouped[rawItem].byDate[date][primaryMetric] = (grouped[rawItem].byDate[date][primaryMetric] || 0) + mainVal;
+    });
+    const sortedDates = Array.from(allDates).sort((a,b) => String(a).localeCompare(String(b)));
+    let itemsToDisplay = [];
+    if (selectedItems.length > 0) {
+      itemsToDisplay = selectedItems;
+    } else {
+      itemsToDisplay = Object.entries(grouped).sort((a, b) => b[1].totalMainMetric - a[1].totalMainMetric).slice(0, 5).map(e => e[0]);
+    }
+    const chartRows = sortedDates.map(date => {
+      const row = { date };
+      itemsToDisplay.forEach(item => { row[item] = grouped[item]?.byDate[date]?.[primaryMetric] || 0; });
+      return row;
+    });
+    const dynamicColors = generateColors(itemsToDisplay.length);
+    return {
+      data: chartRows,
+      activeMetrics: itemsToDisplay,
+      metricsConfig: itemsToDisplay.map((item, i) => ({ key: item, label: labelFormatter(item), color: dynamicColors[i] }))
+    };
+  };
+
+  const overviewChartData = useMemo(() => {
+    const dailyTotals = {}; const allDates = new Set();
+    filteredData.forEach(d => {
+      const date = d.Date; allDates.add(date);
+      if (!dailyTotals[date]) dailyTotals[date] = {};
+      activeMetrics.forEach(m => {
+        const dataVal = m === 'Payout' ? (d.Payout !== undefined ? d.Payout : d.Revenue) : d[m];
+        dailyTotals[date][m] = (dailyTotals[date][m] || 0) + (Number(dataVal) || 0);
+      });
+    });
+    const sortedDates = Array.from(allDates).sort((a,b) => String(a).localeCompare(String(b)));
+    const dynamicColors = generateColors(activeMetrics.length);
+    return {
+      data: sortedDates.map(date => ({ date, ...dailyTotals[date] })),
+      activeMetrics: activeMetrics,
+      metricsConfig: activeMetrics.map((m, i) => ({ key: m, label: m, color: dynamicColors[i] }))
+    };
+  }, [filteredData, activeMetrics]);
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+          <MultiSelect label="Advertiser (广告主)" options={advOptions} value={selectedAdvs} onChange={setSelectedAdvs} placeholder="全部广告主"/>
+          <MultiSelect label="Publisher (渠道)" options={pubOptions} value={selectedPubs} onChange={setSelectedPubs} placeholder="全部渠道"/>
+          <MultiSelect label="Package (包名)" options={pkgOptions} value={selectedPkgs} onChange={setSelectedPkgs} placeholder="全部包名"/>
+          <MultiSelect label="Offer" options={offerOptions} value={selectedOffers} onChange={setSelectedOffers} placeholder="全部 Offer"/>
+        </div>
+        <div className="flex gap-2 bg-slate-50 p-1.5 rounded-xl self-start">
+          {metricOptions.map(m => {
+            const isActive = activeMetrics.includes(m);
+            return (
+              <button key={m} onClick={() => toggleMetric(m)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${isActive ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                {isActive && <div className="w-1.5 h-1.5 rounded-full bg-blue-600"></div>} {m}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-80">
+        <div className="flex items-center gap-2 mb-2"><I name="Activity" size={16}/> <h3 className="font-black text-slate-700 text-xs uppercase tracking-widest">综合趋势概览</h3></div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mb-2">{overviewChartData.metricsConfig.map((cfg, i) => (<div key={i} className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: cfg.color }}></div><span className="text-[10px] font-bold text-slate-500">{cfg.label}</span></div>))}</div>
+        <div className="flex-1 min-h-0"><MultiTrendChart data={overviewChartData.data} activeMetrics={overviewChartData.activeMetrics} metricsConfig={overviewChartData.metricsConfig}/></div>
+      </div>
+      <div className="grid grid-cols-1 gap-8">
+        <ChartCard title="渠道趋势" iconName="ArrowRightLeft" chartData={prepareChartData('Pub ID', selectedPubs)} metric={activeMetrics[0]}/>
+        <ChartCard title="Offer 趋势" iconName="Target" chartData={prepareChartData('Offer', selectedOffers, extractOfferId)} metric={activeMetrics[0]}/>
+        <ChartCard title="广告主趋势" iconName="Award" chartData={prepareChartData('Advertiser ID', selectedAdvs)} metric={activeMetrics[0]}/>
+        <ChartCard title="包名趋势" iconName="Package" chartData={prepareChartData('Package Name', selectedPkgs)} metric={activeMetrics[0]}/>
+      </div>
+    </div>
+  );
+};
+
+const PackageScoutView = ({ data }) => {
+  const [selectedPkg, setSelectedPkg] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const packageGroups = useMemo(() => {
+    const groups = {};
+    data.forEach(d => { const pkg = d['Package Name'], adv = d['Advertiser ID']; if (!pkg || !adv || pkg === 'N/A') return; if (!groups[pkg]) groups[pkg] = { name: pkg, totalRev: 0, advertisers: {} }; groups[pkg].totalRev += (Number(d.Revenue) || 0); if (!groups[pkg].advertisers[adv]) groups[pkg].advertisers[adv] = { id: adv, rev: 0, click: 0, conv: 0 }; groups[pkg].advertisers[adv].rev += (Number(d.Revenue) || 0); groups[pkg].advertisers[adv].click += (Number(d.Click) || 0); groups[pkg].advertisers[adv].conv += (Number(d.Conversion) || 0); });
+    return Object.values(groups).filter(g => Object.keys(g.advertisers).length >= 2).sort((a, b) => b.totalRev - a.totalRev);
+  }, [data]);
+  const filtered = useMemo(() => packageGroups.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())), [packageGroups, searchTerm]);
+  useEffect(() => { if (packageGroups.length > 0 && !selectedPkg) setSelectedPkg(packageGroups[0].name); }, [packageGroups]);
+  const active = useMemo(() => packageGroups.find(g => g.name === selectedPkg), [packageGroups, selectedPkg]);
+  const advMetrics = useMemo(() => active ? Object.values(active.advertisers).map(adv => ({ ...adv, ecpc: adv.click > 0 ? (adv.rev / adv.click) * 1000 : 0, cvr: adv.click > 0 ? (adv.conv / adv.click) * 100 : 0 })) : [], [active]);
+  if (packageGroups.length === 0) return <div className="h-96 flex flex-col items-center justify-center text-slate-400 gap-4"><I name="Package" size={48} className="opacity-20"/><p className="font-bold">暂无"多广告主竞争"的包名数据</p></div>;
+  return (
+    <div className="flex h-[calc(100vh-140px)] gap-6">
+      <div className="w-72 bg-white border border-slate-200 rounded-2xl flex flex-col shrink-0 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-100 bg-slate-50"><h3 className="font-black text-slate-700 text-xs uppercase flex items-center gap-2"><I name="List" size={14}/> 竞争包名 ({packageGroups.length})</h3>
+          <div className="mt-3 relative"><I name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input type="text" placeholder="搜索包名..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-white border-none rounded-lg pl-9 pr-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-600"/></div></div>
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">{filtered.map(pkg => (<button key={pkg.name} onClick={() => setSelectedPkg(pkg.name)} className={`w-full text-left px-4 py-3 rounded-xl border ${selectedPkg === pkg.name ? 'bg-blue-50 border-blue-200' : 'bg-white border-transparent text-slate-500'}`}><div className="font-bold text-xs truncate text-slate-700 mb-1">{pkg.name}</div><div className="flex justify-between items-center text-[10px]"><span className="font-mono text-blue-600 font-bold">${pkg.totalRev.toFixed(0)}</span><span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{Object.keys(pkg.advertisers).length} Advs</span></div></button>))}</div>
+      </div>
+      <div className="flex-1 overflow-y-auto space-y-6">{active && (<><div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between"><div><div className="text-[10px] font-black text-slate-400 uppercase mb-1">目标包名</div><h2 className="text-xl font-black text-slate-800 flex items-center gap-2"><I name="Box" size={20} color="#3b82f6"/> {active.name}</h2></div><div className="text-right"><div className="text-[10px] font-black text-slate-400 uppercase">总营收</div><div className="text-2xl font-black text-slate-800">${active.totalRev.toFixed(2)}</div></div></div>
+        <div className="grid grid-cols-2 gap-6"><div className="bg-white p-6 rounded-2xl border border-slate-200"><SimpleBarChart data={advMetrics} dataKey="ecpc" labelKey="id" title="eCPC 排名" color="#EC4899" unit="$"/></div><div className="bg-white p-6 rounded-2xl border border-slate-200"><SimpleBarChart data={advMetrics} dataKey="cvr" labelKey="id" title="CVR 排名" color="#10B981" unit="%"/></div></div>
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden"><table className="w-full text-left text-sm"><thead><tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase border-b border-slate-100"><th className="px-6 py-4">广告主 ID</th><th className="px-6 py-4">营收</th><th className="px-6 py-4">点击</th><th className="px-6 py-4 text-pink-600">eCPC ($)</th><th className="px-6 py-4 text-emerald-600">CVR (%)</th></tr></thead><tbody>{advMetrics.sort((a,b)=>b.rev-a.rev).map((adv, i) => (<tr key={i} className="border-b border-slate-50 hover:bg-slate-50"><td className="px-6 py-4 font-bold">{adv.id}</td><td className="px-6 py-4 font-bold">${adv.rev.toFixed(2)}</td><td className="px-6 py-4">{adv.click.toLocaleString()}</td><td className="px-6 py-4 font-mono font-bold text-pink-600">${adv.ecpc.toFixed(2)}</td><td className="px-6 py-4 font-mono font-bold text-emerald-600">{adv.cvr.toFixed(2)}%</td></tr>))}</tbody></table></div></>)}</div>
+    </div>
+  );
+};
+
+const AnomalyView = ({ data, onCopy }) => {
+  const dates = useMemo(() => Array.from(new Set(data.map(d => String(d.Date)))).sort((a, b) => String(b).localeCompare(String(a))), [data]);
+  const [selectedDates, setSelectedDates] = useState({ base: '', target: '' });
+  const [offerSearchTerm, setOfferSearchTerm] = useState('');
+  const [minDropPct, setMinDropPct] = useState('80');
+  const [minDropAmt, setMinDropAmt] = useState('2');
+  const [minBaseRev, setMinBaseRev] = useState(2);
+  const [selectedOfferForDetail, setSelectedOfferForDetail] = useState(null);
+  const [modalMetric, setModalMetric] = useState('Payout');
+
+  useEffect(() => { if (dates.length >= 2) setSelectedDates({ base: dates[1], target: dates[0] }); }, [dates]);
+
+  const handleQuickCompare = (baseIndex, targetIndex) => {
+    if (dates[baseIndex] && dates[targetIndex]) setSelectedDates({ base: dates[baseIndex], target: dates[targetIndex] });
+  };
+
+  const anomalyGroups = useMemo(() => {
+    if (!selectedDates.base || !selectedDates.target) return {};
+    const getDailyMap = (date) => data.filter(d => String(d.Date) === date).reduce((acc, d) => {
+      const oid = extractOfferId(d.Offer), pubId = d['Pub ID'] || 'Unknown', key = `${oid}_${pubId}`;
+      if (!acc[key]) acc[key] = { id: oid, pubId, revenue: 0, pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
+      acc[key].revenue += (Number(d.Payout !== undefined ? d.Payout : d.Revenue) || 0);
+      return acc;
+    }, {});
+    const targetMap = getDailyMap(selectedDates.target);
+    const res = [];
+
+    if (selectedDates.base === 'max') {
+      const maxMap = {};
+      dates.forEach(date => {
+        const dMap = getDailyMap(date);
+        Object.keys(dMap).forEach(key => { if (!maxMap[key] || dMap[key].revenue > maxMap[key].revenue) maxMap[key] = { ...dMap[key], maxDate: date }; });
+      });
+      Object.keys(maxMap).forEach(key => {
+        const bRev = maxMap[key].revenue, tRev = targetMap[key]?.revenue || 0;
+        const dropAmt = bRev - tRev;
+        const dropPct = bRev > 0 ? (dropAmt / bRev) * 100 : 0;
+        let isAnomaly = false;
+        const hasPct = minDropPct !== '', hasAmt = minDropAmt !== '';
+        if (hasPct && hasAmt) isAnomaly = dropPct >= Number(minDropPct) || dropAmt >= Number(minDropAmt);
+        else if (hasPct) isAnomaly = dropPct >= Number(minDropPct);
+        else if (hasAmt) isAnomaly = dropAmt >= Number(minDropAmt);
+        else isAnomaly = dropAmt > 0;
+        if (bRev >= minBaseRev && isAnomaly) {
+          if (!offerSearchTerm || maxMap[key].id.includes(offerSearchTerm)) res.push({ ...maxMap[key], baseRev: bRev, targetRev: tRev, drop: dropPct.toFixed(1), dropAmt: dropAmt, baseDateDetail: maxMap[key].maxDate });
+        }
+      });
+    } else {
+      const baseMap = getDailyMap(selectedDates.base);
+      Object.keys(baseMap).forEach(key => {
+        const bRev = baseMap[key].revenue, tRev = targetMap[key]?.revenue || 0;
+        const dropAmt = bRev - tRev;
+        const dropPct = bRev > 0 ? (dropAmt / bRev) * 100 : 0;
+        let isAnomaly = false;
+        const hasPct = minDropPct !== '', hasAmt = minDropAmt !== '';
+        if (hasPct && hasAmt) isAnomaly = dropPct >= Number(minDropPct) || dropAmt >= Number(minDropAmt);
+        else if (hasPct) isAnomaly = dropPct >= Number(minDropPct);
+        else if (hasAmt) isAnomaly = dropAmt >= Number(minDropAmt);
+        else isAnomaly = dropAmt > 0;
+        if (bRev >= minBaseRev && isAnomaly) {
+          if (!offerSearchTerm || baseMap[key].id.includes(offerSearchTerm)) res.push({ ...baseMap[key], baseRev: bRev, targetRev: tRev, drop: dropPct.toFixed(1), dropAmt: dropAmt });
+        }
+      });
+    }
+    res.sort((a, b) => b.dropAmt - a.dropAmt);
+    return res.reduce((acc, item) => { if (!acc[item.pubId]) acc[item.pubId] = []; acc[item.pubId].push(item); return acc; }, {});
+  }, [data, selectedDates, offerSearchTerm, minDropPct, minDropAmt, minBaseRev, dates]);
+
+  const modalChartData = useMemo(() => {
+    if (!selectedOfferForDetail) return null;
+    const { id } = selectedOfferForDetail;
+    const history = data.filter(d => extractOfferId(d.Offer) === id);
+    const pubsFound = Array.from(new Set(history.map(d => d['Pub ID']))).filter(Boolean);
+    const allDates = Array.from(new Set(history.map(d => d.Date))).sort((a,b) => String(a).localeCompare(String(b)));
+    const chartRows = allDates.map(date => {
+      const row = { date };
+      pubsFound.forEach(pub => {
+        const matches = history.filter(h => h.Date === date && h['Pub ID'] === pub);
+        let val = 0;
+        if (modalMetric === 'Payout') val = matches.reduce((a, b) => a + (Number(b.Payout !== undefined ? b.Payout : b.Revenue) || 0), 0);
+        else if (modalMetric === 'Click') val = matches.reduce((a, b) => a + (Number(b.Click) || 0), 0);
+        else if (modalMetric === 'CVR') {
+          const c = matches.reduce((a, b) => a + (Number(b.Click) || 0), 0);
+          const conv = matches.reduce((a, b) => a + (Number(b.Conversion) || 0), 0);
+          val = c > 0 ? (conv / c) * 100 : 0;
+        } else if (modalMetric === 'eCPC') {
+          const c = matches.reduce((a, b) => a + (Number(b.Click) || 0), 0);
+          const r = matches.reduce((a, b) => a + (Number(b.Payout !== undefined ? b.Payout : b.Revenue) || 0), 0);
+          val = c > 0 ? (r / c) : 0;
+        }
+        row[pub] = val;
+      });
+      return row;
+    });
+    const dynamicColors = generateColors(pubsFound.length);
+    return { data: chartRows, activeMetrics: pubsFound, metricsConfig: pubsFound.map((pub, i) => ({ key: pub, label: pub, color: dynamicColors[i] })) };
+  }, [data, selectedOfferForDetail, modalMetric]);
+
+  const formatDateLabel = (dateStr) => {
+    if (dateStr === 'max') return '历史最高 Payout';
+    if (!dateStr) return '';
+    const str = String(dateStr);
+    const month = str.slice(4, 6);
+    const day = str.slice(-2);
+    const index = dates.indexOf(str);
+    if (index === 0) return `昨天${day}日`;
+    if (index === 1) return `前天${day}日`;
+    return `${month}月${day}日`;
+  };
+
+  const getSmallDateLabel = (dateStr) => {
+    if (!dateStr) return '';
+    const str = String(dateStr);
+    return `${str.slice(4,6)}月${str.slice(-2)}日`;
+  };
+
+  return (
+    <div className="space-y-6 relative">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col gap-4">
+        <div className="flex justify-between items-center flex-wrap gap-4">
+          <div><h3 className="font-black text-slate-800 flex items-center gap-2"><I name="AlertTriangle" size={20} color="#f43f5e"/> Payout 异常波动检测</h3></div>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-bold uppercase mb-1">基准 Payout ≥ ($)</span><input type="number" value={minBaseRev} onChange={e => setMinBaseRev(Number(e.target.value))} className="bg-slate-50 border rounded-lg px-3 py-2 text-xs font-bold w-32 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+            <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-bold uppercase mb-1">跌幅比例 ≥ (%)</span><input type="number" value={minDropPct} onChange={e => setMinDropPct(e.target.value)} className="bg-slate-50 border rounded-lg px-3 py-2 text-xs font-bold w-32 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+            <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-bold uppercase mb-1">跌幅金额 ≥ ($)</span><input type="number" value={minDropAmt} onChange={e => setMinDropAmt(e.target.value)} className="bg-slate-50 border rounded-lg px-3 py-2 text-xs font-bold w-32 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+            <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-bold uppercase mb-1">基准日期</span><select value={selectedDates.base} onChange={e => setSelectedDates(s => ({...s, base: e.target.value}))} className="bg-slate-50 border rounded-lg px-3 py-2 text-xs font-bold w-40"><option value="max">周期最高 (Max)</option>{dates.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+            <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-bold uppercase mb-1">目标日期</span><select value={selectedDates.target} onChange={e => setSelectedDates(s => ({...s, target: e.target.value}))} className="bg-slate-50 border rounded-lg px-3 py-2 text-xs font-bold w-40">{dates.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide mr-2">快捷对比:</span>
+            <button onClick={() => handleQuickCompare(1, 0)} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100">T-1 vs T-0</button>
+            <button onClick={() => handleQuickCompare(2, 0)} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100">T-2 vs T0</button>
+            <button onClick={() => setSelectedDates(s => ({...s, base: 'max', target: dates[0]}))} className="px-3 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-100">周期最高vsT-0</button>
+          </div>
+          <div className="h-6 w-px bg-slate-100 mx-2"></div>
+          <div className="flex-1 flex items-center gap-2">
+            <I name="Search" size={14} className="text-slate-400"/>
+            <input type="text" placeholder="按 Offer ID 模糊查询..." value={offerSearchTerm} onChange={(e) => setOfferSearchTerm(e.target.value)} className="bg-transparent text-xs font-bold text-slate-600 outline-none w-full border-b border-transparent focus:border-blue-500"/>
+          </div>
+        </div>
+      </div>
+
+      {Object.entries(anomalyGroups).map(([pub, items]) => (
+        <div key={pub} className="bg-white rounded-2xl border overflow-hidden shadow-sm">
+          <div className="px-6 py-4 bg-slate-50 border-b flex justify-between items-center">
+            <span className="font-bold text-xs uppercase text-slate-700">{pub} ({items.length} 个异常)</span>
+            <div className="flex gap-2">
+              <button onClick={() => onCopy(items.map(i => i.id).join('|'))} className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 border border-rose-100 rounded-lg text-[10px] font-bold text-rose-600 hover:bg-rose-100"><I name="Copy" size={12}/> 复制 IDs</button>
+              <button onClick={() => onCopy(items.map(i => `${i.id}|${i.pkg}|${i.geo}`).join('\n'))} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-lg text-[10px] font-bold text-blue-600 hover:bg-blue-100"><I name="Copy" size={12}/> 复制格式</button>
+            </div>
+          </div>
+          <table className="w-full text-left text-sm">
+            <thead><tr className="text-[10px] text-slate-400 uppercase"><th className="px-6 py-3">Offer ID</th><th className="px-6 py-3">{formatDateLabel(selectedDates.base)}</th><th className="px-6 py-3">{formatDateLabel(selectedDates.target)}</th><th className="px-6 py-3">跌幅比例</th><th className="px-6 py-3">跌幅金额</th></tr></thead>
+            <tbody>
+              {items.map((it, i) => (
+                <tr key={i} className="border-b border-slate-50 hover:bg-blue-50/50 transition-colors group">
+                  <td className="px-6 py-4"><button onClick={() => setSelectedOfferForDetail({ id: it.id })} className="font-bold text-slate-700 flex items-center gap-2 hover:text-blue-600 underline decoration-dotted underline-offset-4">{it.id} <I name="Maximize2" size={12} className="opacity-0 group-hover:opacity-100 transition-opacity"/></button></td>
+                  <td className="px-6 py-4 text-slate-500">${it.baseRev.toFixed(2)}{it.baseDateDetail && <span className="text-[10px] font-bold text-slate-400 ml-1.5 whitespace-nowrap">({getSmallDateLabel(it.baseDateDetail)})</span>}</td>
+                  <td className="px-6 py-4 text-rose-600 font-bold">${it.targetRev.toFixed(2)}</td>
+                  <td className="px-6 py-4 text-rose-600 font-black">-{it.drop}%</td>
+                  <td className="px-6 py-4 text-rose-600 font-black">-${it.dropAmt.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+
+      {selectedOfferForDetail && modalChartData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div><h3 className="font-black text-slate-800 text-lg flex items-center gap-2">Offer {selectedOfferForDetail.id} 多渠道历史对比</h3><span className="text-xs font-bold text-slate-400">正在分析所有曾投放渠道的数据趋势</span></div>
+              <button onClick={() => setSelectedOfferForDetail(null)} className="p-2 hover:bg-slate-200 rounded-full"><I name="X" size={20} className="text-slate-500"/></button>
+            </div>
+            <div className="p-6 flex-1 flex flex-col min-h-0 bg-white overflow-hidden">
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <div className="flex bg-slate-100 p-1 rounded-xl mr-4">
+                  {['Payout', 'Click', 'CVR', 'eCPC'].map(m => (
+                    <button key={m} onClick={() => setModalMetric(m)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${modalMetric === m ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{m}</button>
+                  ))}
+                </div>
+                {modalChartData.metricsConfig.map((cfg, i) => (<div key={i} className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-lg"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: cfg.color }}></div><span className="text-[10px] font-bold text-slate-500">{cfg.label}</span></div>))}
+              </div>
+              <div className="flex-1 w-full border border-slate-100 rounded-xl bg-slate-50/50 p-4">
+                <MultiTrendChart data={modalChartData.data} activeMetrics={modalChartData.activeMetrics} metricsConfig={modalChartData.metricsConfig}/>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const CapWarningView = ({ data, onCopy }) => {
+  const [minConvThreshold, setMinConvThreshold] = useState(5);
+  const groupedWarnings = useMemo(() => {
+    const sortedDates = Array.from(new Set(data.map(d => String(d.Date)))).sort((a, b) => String(b).localeCompare(String(a)));
+    const dailyMap = {}; const advMap = {};
+    data.forEach(d => {
+      const date = String(d.Date);
+      const advOid = d['Adv Offer ID'] ? String(d['Adv Offer ID']) : extractOfferId(d.Offer);
+      if (!advMap[advOid]) advMap[advOid] = d['Advertiser ID'] || '未知广告主';
+      if (!dailyMap[date]) dailyMap[date] = {};
+      if (!dailyMap[date][advOid]) dailyMap[date][advOid] = { conv: 0, rev: 0 };
+      dailyMap[date][advOid].conv += (Number(d.Conversion) || 0);
+      dailyMap[date][advOid].rev += (Number(d.Revenue) || 0);
+    });
+    const warningMap = {};
+    for (let i = 0; i < sortedDates.length - 1; i++) {
+      const targetDate = sortedDates[i], baseDate = sortedDates[i+1];
+      const targetOffers = dailyMap[targetDate], baseOffers = dailyMap[baseDate];
+      if (!targetOffers || !baseOffers) continue;
+      Object.keys(targetOffers).forEach(advOid => {
+        const tConv = targetOffers[advOid].conv, bConv = baseOffers?.[advOid]?.conv || 0;
+        if (tConv >= minConvThreshold && tConv === bConv) {
+          if (!warningMap[advOid]) warningMap[advOid] = { id: advOid, adv: advMap[advOid], pairs: [], uniqueDates: new Set(), conv: tConv, latestRev: targetOffers[advOid].rev };
+          warningMap[advOid].pairs.push(`${baseDate} vs ${targetDate}`);
+          warningMap[advOid].uniqueDates.add(baseDate);
+          warningMap[advOid].uniqueDates.add(targetDate);
+          if (warningMap[advOid].pairs.length === 1) warningMap[advOid].latestRev = targetOffers[advOid].rev;
+        }
+      });
+    }
+    const groups = {};
+    Object.values(warningMap).forEach(w => {
+      const adv = w.adv;
+      if (!groups[adv]) groups[adv] = [];
+      groups[adv].push({ ...w, daysCount: w.uniqueDates.size, pairDetails: w.pairs.join(', ') });
+    });
+    Object.values(groups).forEach(arr => arr.sort((a, b) => b.conv - a.conv));
+    return groups;
+  }, [data, minConvThreshold]);
+
+  return (
+    <div className="space-y-6 relative">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center flex-wrap gap-4">
+        <div><h3 className="font-black text-slate-800 flex items-center gap-2"><I name="Bell" size={20} color="#f59e0b"/> Cap 预警</h3><p className="text-xs text-slate-400 font-bold mt-1">自动扫描相邻日期，按广告主提取连续多日转化数完全一致的 Adv Offer</p></div>
+        <div className="flex flex-col"><span className="text-[10px] text-slate-400 font-bold uppercase mb-1">最低相同转化数 ≥</span><input type="number" value={minConvThreshold} onChange={e => setMinConvThreshold(Number(e.target.value))} className="bg-slate-50 border rounded-lg px-3 py-2 text-xs font-bold w-32 outline-none focus:ring-2 focus:ring-amber-500/20"/></div>
+      </div>
+      {Object.keys(groupedWarnings).length === 0 ? (
+        <div className="bg-white rounded-2xl border overflow-hidden shadow-sm p-8 text-center text-slate-400 text-xs font-bold">无 Cap 预警数据</div>
+      ) : Object.entries(groupedWarnings).map(([adv, items]) => {
+        const uniqueIds = Array.from(new Set(items.map(w => w.id)));
+        return (
+          <div key={adv} className="bg-white rounded-2xl border overflow-hidden shadow-sm">
+            <div className="px-6 py-4 bg-slate-50 border-b flex justify-between items-center">
+              <span className="font-bold text-xs uppercase text-slate-700">归属广告主: {adv} ({items.length} 个预警)</span>
+              <button onClick={() => onCopy(uniqueIds.join('|'))} className="bg-amber-50 border border-amber-200 text-amber-600 px-4 py-2 rounded-xl text-[10px] font-bold flex items-center gap-2 shadow-sm hover:bg-amber-100"><I name="Copy" size={12}/> 复制 Adv Offer IDs ({uniqueIds.length})</button>
+            </div>
+            <table className="w-full text-left text-sm">
+              <thead className="bg-white text-[10px] uppercase text-slate-500 border-b border-slate-100"><tr><th className="px-6 py-4">Adv Offer ID</th><th className="px-6 py-4">归属 ADV</th><th className="px-6 py-4">连续相同天数</th><th className="px-6 py-4">触发日期详情</th><th className="px-6 py-4 text-amber-600">转化数</th><th className="px-6 py-4">最新当日营收</th></tr></thead>
+              <tbody>{items.map((w, i) => (<tr key={i} className="border-b border-slate-50 hover:bg-slate-50"><td className="px-6 py-4 font-bold text-slate-700">{w.id}</td><td className="px-6 py-4 text-slate-500 font-medium">{adv}</td><td className="px-6 py-4 font-black text-amber-600">{w.daysCount} 天</td><td className="px-6 py-4 text-slate-500 text-xs">{w.pairDetails}</td><td className="px-6 py-4 font-black text-amber-600">{w.conv}</td><td className="px-6 py-4 font-bold text-slate-700">${w.latestRev.toFixed(2)}</td></tr>))}</tbody>
+            </table>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const ExclusionView = ({ data, filters, setFilters, onCopy }) => {
+  const filtered = useMemo(() => {
+    const map = data.reduce((acc, d) => {
+      const oid = extractOfferId(d.Offer); if (!acc[oid]) acc[oid] = { id: oid, click: 0, conv: 0, rev: 0 };
+      acc[oid].click += (Number(d.Click) || 0); acc[oid].conv += (Number(d.Conversion) || 0); acc[oid].rev += (Number(d.Revenue) || 0); return acc;
+    }, {});
+    return Object.values(map).map(o => ({ ...o, cvr: o.click > 0 ? (o.conv/o.click)*100 : 0, ecpc: o.click > 0 ? o.rev/o.click : 0 }))
+      .filter(o => o.click >= filters.minClicks && o.cvr <= filters.maxCvr && o.ecpc <= filters.maxEcpc && o.rev <= filters.maxRevenue);
+  }, [data, filters]);
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-8 items-center">
+        <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最小点击数</span><input type="number" step="any" value={filters.minClicks} onChange={e => setFilters({...filters, minClicks: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+        <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最大 CVR %</span><input type="number" step="any" value={filters.maxCvr} onChange={e => setFilters({...filters, maxCvr: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+        <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最大 eCPC</span><input type="number" step="any" value={filters.maxEcpc} onChange={e => setFilters({...filters, maxEcpc: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+        <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最大 Revenue</span><input type="number" step="any" value={filters.maxRevenue} onChange={e => setFilters({...filters, maxRevenue: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+        <button onClick={() => onCopy(filtered.map(o => o.id).join('|'))} className="bg-rose-600 text-white px-4 py-2 rounded-xl text-xs font-bold ml-auto flex items-center gap-2 shadow-sm"><I name="Copy" size={14}/> 复制 ID ({filtered.length})</button>
+      </div>
+      <div className="bg-white rounded-2xl border overflow-hidden shadow-sm">
+        <table className="w-full text-left text-sm"><thead className="bg-slate-50 text-[10px] uppercase"><tr><th className="px-6 py-4">Offer ID</th><th className="px-6 py-4">点击</th><th className="px-6 py-4">CVR%</th><th className="px-6 py-4">营收</th></tr></thead>
+          <tbody>{filtered.map((o, i) => (<tr key={i} className="border-b"><td>{o.id}</td><td>{o.click}</td><td>{o.cvr.toFixed(2)}%</td><td>${o.rev.toFixed(2)}</td></tr>))}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const RankingView = ({ data, onCopy }) => {
+  const topOffers = useMemo(() => {
+    const grouped = data.reduce((acc, d) => { const k = d.Offer || 'Unknown'; acc[k] = (acc[k] || 0) + (Number(d.Revenue) || 0); return acc; }, {});
+    return Object.entries(grouped).sort((a,b) => b[1] - a[1]).slice(0, 10);
+  }, [data]);
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm max-w-2xl">
+      <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+        <h3 className="font-black text-slate-800">绩效排行 (Top 10 Offers)</h3>
+        <button onClick={() => onCopy(topOffers.map(o => extractOfferId(o[0])).join('|'))} className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-md"><I name="Copy" size={14}/> 复制 IDs</button>
+      </div>
+      {topOffers.map((item, i) => (
+        <div key={i} className="px-6 py-4 flex justify-between items-center border-b last:border-0 text-sm hover:bg-slate-50">
+          <div className="flex items-center gap-4"><span className="text-xs font-black text-slate-300">NO.{(i+1).toString().padStart(2, '0')}</span><span className="font-medium text-slate-700 truncate max-w-md">{item[0]}</span></div>
+          <span className="font-black text-blue-600">${item[1].toFixed(2)}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
+  const recommendations = useMemo(() => {
+    const pubs = Array.from(new Set(data.map(d => String(d['Pub ID'] || '')))).filter(p => p !== 'undefined' && p !== '').sort();
+    const globalStats = {}, localStats = {};
+    data.forEach(d => {
+      const pubId = String(d['Pub ID']), oid = extractOfferId(d.Offer);
+      if (!globalStats[oid]) globalStats[oid] = { id: oid, name: d.Offer, totalRev: 0, totalClick: 0, totalConv: 0, byPub: {}, advertiserId: d['Advertiser ID'] || '', pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
+      globalStats[oid].totalRev += (Number(d.Revenue) || 0);
+      globalStats[oid].totalClick += (Number(d.Click) || 0);
+      globalStats[oid].totalConv += (Number(d.Conversion) || 0);
+      globalStats[oid].byPub[pubId] = true;
+      if (!localStats[pubId]) localStats[pubId] = {};
+      if (!localStats[pubId][oid]) localStats[pubId][oid] = { id: oid, rev: 0, click: 0, conv: 0, pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
+      localStats[pubId][oid].rev += (Number(d.Revenue) || 0);
+      localStats[pubId][oid].click += (Number(d.Click) || 0);
+      localStats[pubId][oid].conv += (Number(d.Conversion) || 0);
+    });
+    return pubs.map(pub => {
+      const isSameAdv = (pS, aS) => { const cP = pS.replace(/^\d+-/, '').toLowerCase().trim(), cA = aS.replace(/^\d+-/, '').toLowerCase().trim(); return cP === cA || (cP.length > 2 && cA.length > 2 && (cP.includes(cA) || cA.includes(cP))); };
+      const blueOcean = Object.values(globalStats).map(o => ({...o, cvr: o.totalClick > 0 ? (o.totalConv / o.totalClick) * 100 : 0, ecpc: o.totalClick > 0 ? o.totalRev / o.totalClick : 0})).filter(o => !o.byPub[pub] && !isSameAdv(pub, o.advertiserId) && (o.totalRev >= filters.minRevenue) && (o.totalConv >= filters.minConv)).sort((a,b)=>b.totalRev-a.totalRev);
+      const pubOffers = Object.values(localStats[pub]).map(o => ({...o, ecpc: o.click > 0 ? (o.rev/o.click) : 0, cvr: o.click > 0 ? (o.conv/o.click)*100 : 0}));
+      return { pub, blueOcean, topEcpc: [...pubOffers].sort((a,b)=>b.ecpc-a.ecpc).slice(0, 20), topCvr: [...pubOffers].sort((a,b)=>b.cvr-a.cvr).slice(0, 20) };
+    }).filter(r => r.blueOcean.length > 0 || r.topEcpc.length > 0);
+  }, [data, filters]);
+
+  const copyFormatted = (items) => { const text = items.map(o => `${o.id}|${o.pkg}|${o.geo}`).join('\n'); copyToClipboard(text); onCopy(text); };
+  const copyIds = (items) => onCopy(items.map(o => o.id).join('|'));
+
+  return (
+    <div className="space-y-8">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-wrap gap-6 items-end shadow-sm">
+        <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最小营收 ($)</span><input type="number" step="any" value={filters.minRevenue} onChange={e => setFilters({...filters, minRevenue: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+        <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最小转化数</span><input type="number" step="any" value={filters.minConv} onChange={e => setFilters({...filters, minConv: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+        <div className="ml-auto flex items-center gap-4">
+          <span className="text-[10px] text-slate-400 font-bold">* 筛选仅针对蓝海拓量生效</span>
+          <div className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2"><I name="Info" size={14}/> 共分析 {data.length} 条原始数据</div>
+        </div>
+      </div>
+      {recommendations.map(res => (
+        <div key={res.pub} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6">
+          <div className="flex items-center gap-3 mb-6 border-l-4 border-blue-600 pl-4"><h3 className="text-lg font-black text-slate-800">Channel: <span className="text-blue-600">{res.pub}</span></h3></div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-slate-50/50 rounded-xl p-5 border border-slate-100">
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="font-black text-slate-700 text-sm flex items-center gap-2"><I name="Compass" size={16} color="#3b82f6"/> 可向 {res.pub.split('-')[0]} 推荐 (NEW)</h4>
+                <div className="flex gap-2"><button onClick={() => copyIds(res.blueOcean)} className="bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-slate-50">复制 ID</button><button onClick={() => copyFormatted(res.blueOcean)} className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200">复制格式</button></div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {res.blueOcean.slice(0, 12).map((o, i) => (<div key={i} className="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-2"><span>{o.id}</span><span className="text-slate-300">|</span><span className="text-emerald-600">${o.totalRev.toFixed(0)}</span></div>))}
+                {res.blueOcean.length > 12 && <div className="px-3 py-1.5 text-xs font-bold text-slate-400 flex items-center">+{res.blueOcean.length - 12} more...</div>}
+                {res.blueOcean.length === 0 && <div className="text-slate-400 text-xs italic">暂无推荐</div>}
+              </div>
+            </div>
+            <div className="space-y-6">
+              <h4 className="font-black text-slate-700 text-sm flex items-center gap-2 mb-2"><I name="Zap" size={16} color="#f59e0b"/> 已有 OFFER 增量 (EXISTING)</h4>
+              <div>
+                <div className="flex justify-between items-center mb-2"><span className="text-xs font-bold text-rose-500 flex items-center gap-1"><I name="Flame" size={12}/> Top 20 High eCPC</span><div className="flex gap-2"><button onClick={() => copyIds(res.topEcpc)} className="bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold">ID</button><button onClick={() => copyFormatted(res.topEcpc)} className="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">Format</button></div></div>
+                <div className="flex flex-wrap gap-1.5">{res.topEcpc.map((o, i) => (<span key={i} className="bg-rose-50 border border-rose-100 text-rose-600 px-2 py-1 rounded-md text-[10px] font-mono font-bold">{o.id}</span>))}</div>
+              </div>
+              <div>
+                <div className="flex justify-between items-center mb-2"><span className="text-xs font-bold text-emerald-500 flex items-center gap-1"><I name="Diamond" size={12}/> Top 20 High CVR</span><div className="flex gap-2"><button onClick={() => copyIds(res.topCvr)} className="bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold">ID</button><button onClick={() => copyFormatted(res.topCvr)} className="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">Format</button></div></div>
+                <div className="flex flex-wrap gap-1.5">{res.topCvr.map((o, i) => (<span key={i} className="bg-emerald-50 border border-emerald-100 text-emerald-600 px-2 py-1 rounded-md text-[10px] font-mono font-bold">{o.id}</span>))}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/* ========== App ========== */
+
+const dayOffset = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10).replace(/-/g, '');
+};
+
+export default function App() {
+  const [rawData, setRawData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [toast, setToast] = useState('');
+  const [dateFrom, setDateFrom] = useState(dayOffset(13));
+  const [dateTo, setDateTo] = useState(dayOffset(0));
+  const [lastRefresh, setLastRefresh] = useState(null);
+  const [filters, setFilters] = useState({ minRevenue: 5, minConv: 20, minClicks: 1000, maxCvr: 0.1, maxEcpc: 0.1, maxRevenue: 1 });
+
+  const loadData = useCallback(async (from, to) => {
+    setLoading(true);
+    setError('');
+    try {
+      const rows = await fetchReport(from || dateFrom, to || dateTo);
+      setRawData(rows);
+      setLastRefresh(new Date());
+    } catch (e) {
+      setError('数据加载失败: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [dateFrom, dateTo]);
+
+  useEffect(() => { loadData(); }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => loadData(), 3600000);
+    return () => clearInterval(timer);
+  }, [loadData]);
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2000); };
+
+  const handleDateApply = (from, to) => {
+    setDateFrom(from);
+    setDateTo(to);
+    loadData(from, to);
+  };
+
+  const tabLabel = { dashboard: "总览看板", trend: "趋势分析", packageScout: "包名透视", anomaly: "异常监控", capWarning: "Cap预警", exclusion: "每日剔除", expansion: "拓量蓝海", ranking: "绩效排行" };
+
+  return (
+    <div className="flex h-screen bg-[#F8FAFC] text-slate-700 overflow-hidden font-sans">
+      {toast && (<div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-2"><I name="CheckCircle2" size={16} color="#34d399"/> <span className="text-sm font-bold">{toast}</span></div>)}
+      <div className="w-64 bg-white border-r flex flex-col shrink-0">
+        <div className="p-8 flex items-center gap-2 font-black text-2xl text-blue-600 italic">分析助手-zhe</div>
+        <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
+          <NavItem iconName="LayoutDashboard" label="总览看板" active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')}/>
+          <NavItem iconName="LineChart" label="趋势分析" active={activeTab==='trend'} onClick={()=>setActiveTab('trend')}/>
+          <NavItem iconName="Package" label="包名透视" active={activeTab==='packageScout'} onClick={()=>setActiveTab('packageScout')}/>
+          <NavItem iconName="AlertTriangle" label="异常监控" active={activeTab==='anomaly'} onClick={()=>setActiveTab('anomaly')}/>
+          <NavItem iconName="Bell" label="Cap预警" active={activeTab==='capWarning'} onClick={()=>setActiveTab('capWarning')}/>
+          <NavItem iconName="FilterX" label="每日剔除" active={activeTab==='exclusion'} onClick={()=>setActiveTab('exclusion')}/>
+          <NavItem iconName="Compass" label="拓量蓝海" active={activeTab==='expansion'} onClick={()=>setActiveTab('expansion')}/>
+          <NavItem iconName="Award" label="绩效排行" active={activeTab==='ranking'} onClick={()=>setActiveTab('ranking')}/>
+        </nav>
+        {lastRefresh && <div className="px-4 py-3 border-t text-[10px] text-slate-400 font-bold flex items-center gap-1.5"><I name="CheckCircle2" size={12} color="#10b981"/> 最后刷新: {lastRefresh.toLocaleTimeString()}</div>}
+      </div>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="h-16 px-8 flex items-center bg-white border-b shrink-0 justify-between">
+          <h2 className="font-bold text-slate-800 text-lg uppercase tracking-widest">{tabLabel[activeTab]}</h2>
+        </header>
+        <div className="px-8 pt-4 shrink-0">
+          <DateRangePicker data={rawData} dateFrom={dateFrom} dateTo={dateTo} onApply={handleDateApply} onRefresh={() => loadData()} loading={loading}/>
+          {error && <div className="mt-2 text-rose-500 text-sm font-bold">{error}</div>}
+        </div>
+        <main className="flex-1 overflow-y-auto p-8 pt-4">
+          {loading && rawData.length === 0 ? (
+            <div className="h-96 flex flex-col items-center justify-center text-slate-400 gap-4"><svg className="animate-spin h-10 w-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><p className="font-bold">正在加载数据...</p></div>
+          ) : (
+            <>
+              {activeTab === 'dashboard' && <DashboardView data={rawData} />}
+              {activeTab === 'trend' && <TrendAnalysisView data={rawData} />}
+              {activeTab === 'packageScout' && <PackageScoutView data={rawData} />}
+              {activeTab === 'anomaly' && <AnomalyView data={rawData} onCopy={t => {copyToClipboard(t); showToast("复制成功");}} />}
+              {activeTab === 'capWarning' && <CapWarningView data={rawData} onCopy={t => {copyToClipboard(t); showToast("预警ID已复制");}} />}
+              {activeTab === 'exclusion' && <ExclusionView data={rawData} filters={filters} setFilters={setFilters} onCopy={t => {copyToClipboard(t); showToast("已复制名单");}} />}
+              {activeTab === 'expansion' && <ExpansionView data={rawData} filters={filters} setFilters={setFilters} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
+              {activeTab === 'ranking' && <RankingView data={rawData} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
+            </>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
