@@ -179,7 +179,7 @@ def fetch_reject_records(dates):
 
 
 def _build_table(day_records):
-    sep = '-' * 100
+    sep = '-' * 78
     lines = []
 
     header_cols = [_cjk_pad(c[0], c[1], c[2]) for c in COLS]
