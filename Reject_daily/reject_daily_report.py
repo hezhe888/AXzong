@@ -139,7 +139,7 @@ def fetch_reject_records(dates):
     cursor.close()
     conn.close()
 
-    records.sort(key=lambda x: (x[0], -x[6]))
+    records.sort(key=lambda x: (x[0], -x[7]))
     return records, unknown_mids
 
 
