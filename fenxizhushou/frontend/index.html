@@ -130,6 +130,28 @@ const getPubLabel = (mid) => {
   return name ? `${m}-${name}` : m;
 };
 
+let advNameMap = {};
+const fetchAdvNames = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/api/advnames`);
+    if (res.ok) advNameMap = await res.json();
+  } catch(e) {}
+};
+const detectUnknown = (data) => {
+  const unknownPubs = new Set();
+  const unknownAdvs = new Set();
+  data.forEach(d => {
+    const pub = String(d['Pub ID'] || '');
+    if (pub && pub !== 'jk-all' && !pubNameMap[pub]) unknownPubs.add(pub);
+    const adv = String(d['Advertiser ID'] || '');
+    if (adv && !advNameMap[adv]) unknownAdvs.add(adv);
+  });
+  return {
+    pubs: Array.from(unknownPubs).sort(),
+    advs: Array.from(unknownAdvs).sort()
+  };
+};
+
 /* ========== Components ========== */
 
 const NavItem = ({ iconName, label, active, onClick }) => (
@@ -1069,6 +1091,7 @@ function App() {
   const [dateTo, setDateTo] = useState(dayOffset(0));
   const [lastRefresh, setLastRefresh] = useState(null);
   const [latestData, setLatestData] = useState({ latest_date: '', latest_created: '' });
+  const [unknownIds, setUnknownIds] = useState({ pubs: [], advs: [] });
   const [filters, setFilters] = useState({ minRevenue: 5, minConv: 20, minClicks: 1000, maxCvr: 0.1, maxEcpc: 0.1, maxRevenue: 1, minPayout: 1, minEcpc: 1, minCvr: 1 });
 
   const loadData = useCallback(async (from, to) => {
@@ -1077,13 +1100,13 @@ function App() {
     try {
       const rows = await fetchReport(from || dateFrom, to || dateTo);
       const jkMids = new Set(Object.entries(pubNameMap).filter(([m, n]) => String(n).toLowerCase().includes('jk')).map(([m]) => m));
+      let processed = rows;
       if (jkMids.size > 0) {
-        const merged = rows.map(r => jkMids.has(String(r['Pub ID'])) ? { ...r, 'Pub ID': 'jk-all' } : r);
-        setRawData(merged);
-      } else {
-        setRawData(rows);
+        processed = rows.map(r => jkMids.has(String(r['Pub ID'])) ? { ...r, 'Pub ID': 'jk-all' } : r);
       }
+      setRawData(processed);
       setLastRefresh(new Date());
+      setUnknownIds(detectUnknown(processed));
       fetchLatest().then(setLatestData);
     } catch (e) {
       setError('数据加载失败: ' + e.message);
@@ -1092,7 +1115,7 @@ function App() {
     }
   }, [dateFrom, dateTo]);
 
-  useEffect(() => { fetchPubNames().then(() => { loadData(); fetchLatest().then(setLatestData); }); }, []);
+  useEffect(() => { fetchPubNames().then(() => fetchAdvNames()).then(() => { loadData(); fetchLatest().then(setLatestData); }); }, []);
 
   useEffect(() => {
     const timer = setInterval(() => loadData(), 3600000);
@@ -1133,6 +1156,17 @@ function App() {
         <div className="px-8 pt-4 shrink-0">
           <DateRangePicker dateFrom={dateFrom} dateTo={dateTo} onApply={handleDateApply} onRefresh={() => loadData()} loading={loading}/>
           {error && <div className="mt-2 text-rose-500 text-sm font-bold">{error}</div>}
+          {(unknownIds.pubs.length > 0 || unknownIds.advs.length > 0) && (
+            <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-3 text-xs">
+              <I name="AlertTriangle" size={16} color="#f59e0b"/>
+              <div className="space-y-1">
+                <span className="font-black text-amber-700">未知 ID 告警</span>
+                {unknownIds.pubs.length > 0 && <div className="text-amber-600">未知 Pub ID（需补充 pub 名称）：<code className="bg-amber-100 px-1 rounded">{unknownIds.pubs.join(', ')}</code></div>}
+                {unknownIds.advs.length > 0 && <div className="text-amber-600">未知 Adv ID（需补充广告主名称）：<code className="bg-amber-100 px-1 rounded">{unknownIds.advs.join(', ')}</code></div>}
+                <div className="text-amber-500 text-[10px]">请将对应的名称告诉 Agent，更新映射表</div>
+              </div>
+            </div>
+          )}
         </div>
         <main className="flex-1 overflow-y-scroll p-8 pt-4">
           {loading && rawData.length === 0 ? (

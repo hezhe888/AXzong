@@ -132,5 +132,19 @@ def get_pub_names():
             return json.load(f)
     return {}
 
+@app.get("/api/advnames")
+def get_adv_names():
+    mapping_str = os.environ.get("ADV_MAPPING", "")
+    if mapping_str:
+        try:
+            return json.loads(mapping_str)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    mapping_path = Path(__file__).resolve().parent.parent.parent / "adv_mapping.json"
+    if mapping_path.exists():
+        with open(mapping_path, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True))
