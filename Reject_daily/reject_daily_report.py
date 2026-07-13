@@ -113,12 +113,11 @@ def fetch_reject_records(dates):
         reject = int(row[4]) if row[4] else 0
         conv = int(row[5]) if row[5] else 0
 
-        if conv == 0 and reject > 0:
-            rate = 1.0
-        elif conv == 0:
+        total = reject + conv
+        if total == 0:
             rate = 0
         else:
-            rate = reject / conv
+            rate = reject / total
 
         if rate > REJECT_RATE_THRESHOLD:
             results.append((date_str, oid, pkg, country, reject, conv, rate))
