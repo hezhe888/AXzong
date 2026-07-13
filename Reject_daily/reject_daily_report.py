@@ -172,6 +172,7 @@ def main():
                 print(f"Retry {attempt} succeeded")
 
             message = build_message(date_str, offers, overall)
+            print(message)
             result = send_feishu(message)
             print(f"Sent successfully: {result}")
             return
