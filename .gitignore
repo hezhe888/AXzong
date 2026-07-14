@@ -6,4 +6,5 @@ pub_mapping.json
 adv_mapping.json
 __pycache__/
 *.pyc
+*.backup.html
 .DS_Store

@@ -1268,10 +1268,12 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
     const globalStats = {}, localStats = {};
     data.forEach(d => {
       const pubId = String(d['Pub ID']), oid = extractOfferId(d.Offer);
-      if (!globalStats[oid]) globalStats[oid] = { id: oid, name: d.Offer, totalRev: 0, totalClick: 0, totalConv: 0, byPub: {}, advertiserId: d['Advertiser ID'] || '', pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
+      if (!globalStats[oid]) globalStats[oid] = { id: oid, name: d.Offer, totalRev: 0, totalClick: 0, totalConv: 0, totalPayout: 0, totalCbConv: 0, byPub: {}, advertiserId: d['Advertiser ID'] || '', pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
       globalStats[oid].totalRev += (Number(d.Revenue) || 0);
+      globalStats[oid].totalPayout += (Number(d.Payout) || 0);
       globalStats[oid].totalClick += (Number(d.Click) || 0);
       globalStats[oid].totalConv += (Number(d.Conversion) || 0);
+      globalStats[oid].totalCbConv += (Number(d['Callback Conversion']) || 0);
       globalStats[oid].byPub[pubId] = true;
       if (!localStats[pubId]) localStats[pubId] = {};
       if (!localStats[pubId][oid]) localStats[pubId][oid] = { id: oid, rev: 0, payout: 0, click: 0, conv: 0, cbconv: 0, pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
@@ -1283,7 +1285,7 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
     });
     return pubs.map(pub => {
       const isSameAdv = (pS, aS) => { const cP = pS.replace(/^\d+-/, '').toLowerCase().trim(), cA = aS.replace(/^\d+-/, '').toLowerCase().trim(); return cP === cA || (cP.length > 2 && cA.length > 2 && (cP.includes(cA) || cA.includes(cP))); };
-      const blueOcean = Object.values(globalStats).map(o => ({...o, cvr: o.totalClick > 0 ? (o.totalConv / o.totalClick) * 100 : 0, ecpc: o.totalClick > 0 ? o.totalRev / o.totalClick : 0})).filter(o => !o.byPub[pub] && !isSameAdv(pub, o.advertiserId) && (o.totalRev >= filters.minRevenue) && (o.totalConv >= filters.minConv) && (o.ecpc >= filters.minEcpcBlue) && (o.cvr >= filters.minCvrBlue)).sort((a,b)=>b.totalRev-a.totalRev);
+      const blueOcean = Object.values(globalStats).map(o => ({...o, cvr: o.totalClick > 0 ? (o.totalCbConv / o.totalClick) * 100 : 0, ecpc: o.totalClick > 0 ? (o.totalPayout / o.totalClick) * 1000 : 0})).filter(o => !o.byPub[pub] && !isSameAdv(pub, o.advertiserId) && (o.totalRev >= filters.minRevenue) && (o.totalConv >= filters.minConv) && (o.ecpc >= filters.minEcpcBlue) && (o.cvr >= filters.minCvrBlue)).sort((a,b)=>b.totalRev-a.totalRev);
       const pubOffers = Object.values(localStats[pub]).map(o => ({...o, ecpc: o.click > 0 ? ((o.payout/o.click)*1000) : 0, cvr: o.click > 0 ? ((o.cbconv/o.click)*100) : 0})).filter(o => o.payout >= filters.minPayout && o.ecpc >= filters.minEcpc && o.cvr >= filters.minCvr && o.click >= filters.minClickEcpc);
       return { pub, blueOcean, topEcpc: [...pubOffers].sort((a,b)=>b.ecpc-a.ecpc).slice(0, 20), topCvr: [...pubOffers].sort((a,b)=>b.cvr-a.cvr).slice(0, 20) };
     }).filter(r => r.blueOcean.length > 0 || r.topEcpc.length > 0);
