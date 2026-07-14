@@ -1247,7 +1247,7 @@ const IdJoinerView = () => {
   const [sep, setSep] = useState('|');
   const [mode, setMode] = useState('join');
   const extractIds = (text) => {
-    const tokens = text.split(/[,;\s\r\n]+/).filter(Boolean);
+    const tokens = text.split(/[|,;\s\r\n]+/).filter(Boolean);
     const ids = []; const seen = new Set();
     tokens.forEach(t => {
       const tid = extractOfferId(t.trim());
