@@ -174,32 +174,35 @@ const StatCard = ({ title, value, iconName }) => (
 
 const DateRangePicker = ({ dateFrom, dateTo, onApply, onRefresh, loading }) => {
   const [availableDates, setAvailableDates] = useState([]);
+  const [activeQuick, setActiveQuick] = useState('7d');
   useEffect(() => { fetchDates().then(setAvailableDates).catch(() => {}); }, []);
   const formatLabel = (d) => {
     if (!d || d.length < 8) return d;
     const m = parseInt(d.slice(4,6)), day = parseInt(d.slice(6,8));
     return `${m}月${day}日`;
   };
+  const q = (label) => `px-3 py-2 rounded-lg text-xs font-bold transition-colors ${activeQuick === label ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`;
   return (
   <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-4 flex-wrap">
     <I name="Calendar" size={20} color="#3b82f6"/>
     <div className="flex items-center gap-2">
-      <select value={dateFrom} onChange={e => onApply(e.target.value, dateTo)}
+      <select value={dateFrom} onChange={e => { setActiveQuick(null); onApply(e.target.value, dateTo); }}
         className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
         {availableDates.map(d => <option key={d} value={d}>{formatLabel(d)}</option>)}
       </select>
       <span className="text-slate-400 font-bold">→</span>
-      <select value={dateTo} onChange={e => onApply(dateFrom, e.target.value)}
+      <select value={dateTo} onChange={e => { setActiveQuick(null); onApply(dateFrom, e.target.value); }}
         className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
         {availableDates.map(d => <option key={d} value={d}>{formatLabel(d)}</option>)}
       </select>
     </div>
     <div className="flex gap-2">
-      <button onClick={() => onApply(dayOffset(0), dayOffset(0))} className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100">今天</button>
-      <button onClick={() => onApply(dayOffset(2), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近3天</button>
-      <button onClick={() => onApply(dayOffset(6), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近7天</button>
-      <button onClick={() => onApply(dayOffset(13), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近14天</button>
-      <button onClick={() => onApply(dayOffset(29), dayOffset(0))} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100">近30天</button>
+      <button onClick={() => { onApply(dayOffset(0), dayOffset(0)); setActiveQuick('today'); }} className={q('today')}>今天</button>
+      <button onClick={() => { onApply(dayOffset(1), dayOffset(1)); setActiveQuick('yesterday'); }} className={q('yesterday')}>昨天</button>
+      <button onClick={() => { onApply(dayOffset(3), dayOffset(1)); setActiveQuick('3d'); }} className={q('3d')}>近3天</button>
+      <button onClick={() => { onApply(dayOffset(7), dayOffset(1)); setActiveQuick('7d'); }} className={q('7d')}>近7天</button>
+      <button onClick={() => { onApply(dayOffset(14), dayOffset(1)); setActiveQuick('14d'); }} className={q('14d')}>近14天</button>
+      <button onClick={() => { onApply(dayOffset(30), dayOffset(1)); setActiveQuick('30d'); }} className={q('30d')}>近30天</button>
     </div>
     <button onClick={onRefresh} disabled={loading} className={`ml-auto px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${loading ? 'bg-slate-100 text-slate-400' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'}`}>
       <I name="RefreshCw" size={14} className={loading ? 'animate-spin' : ''}/> {loading ? '加载中...' : '刷新'}
@@ -275,7 +278,7 @@ const MultiSelect = ({ options, value = [], onChange, placeholder = "Select...",
   );
 };
 
-const SimpleBarChart = ({ data, dataKey, labelKey, color, unit = '', title }) => {
+const SimpleBarChart = ({ data, dataKey, labelKey, color, unit = '', title, colors }) => {
   if (!data || data.length === 0) return <div className="text-slate-400 text-xs italic">无数据</div>;
   const sortedData = [...data].sort((a, b) => b[dataKey] - a[dataKey]);
   const maxValue = Math.max(...sortedData.map(d => d[dataKey])) || 1;
@@ -285,11 +288,12 @@ const SimpleBarChart = ({ data, dataKey, labelKey, color, unit = '', title }) =>
       <div className="space-y-2">
         {sortedData.map((item, i) => {
           const width = (item[dataKey] / maxValue) * 100;
+          const barColor = colors ? colors[i % colors.length] : color;
           return (
             <div key={i} className="flex items-center gap-3 text-xs group">
-              <div className="w-24 text-right font-bold text-slate-600 truncate" title={item[labelKey]}>{item[labelKey].split('-')[0]}...</div>
+              <div className="w-44 text-right font-bold text-slate-600 truncate" title={item[labelKey]}>{item[labelKey]}</div>
               <div className="flex-1 h-6 bg-slate-50 rounded-md overflow-hidden relative">
-                <div className="h-full rounded-md transition-all duration-500 ease-out flex items-center justify-end px-2" style={{ width: `${width}%`, backgroundColor: color }}>
+                <div className="h-full rounded-md transition-all duration-500 ease-out flex items-center justify-end px-2" style={{ width: `${width}%`, backgroundColor: barColor }}>
                   <span className="text-[10px] font-black text-white drop-shadow-md">{unit}{item[dataKey].toFixed(2)}{unit === '%' ? '%' : ''}</span>
                 </div>
               </div>
@@ -501,6 +505,21 @@ const DashboardView = ({ data }) => {
     return { data: chartRows, activeMetrics: topPubs, metricsConfig };
   }, [data]);
 
+  const isSingleDay = useMemo(() => {
+    const dates = new Set(data.map(d => d.Date));
+    return dates.size <= 1;
+  }, [data]);
+
+  const barChartData = useMemo(() => {
+    if (!isSingleDay) return [];
+    const pubRev = {};
+    data.forEach(d => {
+      const pub = getPubLabel(String(d['Pub ID'] || 'Unknown'));
+      pubRev[pub] = (pubRev[pub] || 0) + (Number(d.Revenue) || 0);
+    });
+    return Object.entries(pubRev).map(([id, rev]) => ({ id, rev })).sort((a, b) => b.rev - a.rev);
+  }, [data, isSingleDay]);
+
   return (
     <div className="space-y-8 w-full flex flex-col" style={{minHeight: 'calc(100vh - 200px)'}}>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 shrink-0">
@@ -522,7 +541,115 @@ const DashboardView = ({ data }) => {
           </div>
         </div>
         <div className="flex-1 w-full min-h-0">
-          <MultiTrendChart data={channelData.data} activeMetrics={channelData.activeMetrics} metricsConfig={channelData.metricsConfig}/>
+          {isSingleDay ? (
+            <SimpleBarChart data={barChartData} dataKey="rev" labelKey="id" color="#3b82f6" unit="$" title="各渠道营收" colors={generateColors(barChartData.length)} />
+          ) : (
+            <MultiTrendChart data={channelData.data} activeMetrics={channelData.activeMetrics} metricsConfig={channelData.metricsConfig}/>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const TrendExplorerView = ({ data }) => {
+  const dims = ['Pub ID', 'Advertiser ID', 'Package Name', 'Offer'];
+  const [dimKey, setDimKey] = useState('Pub ID');
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [activeMetrics, setActiveMetrics] = useState(['Payout', 'Revenue']);
+  const metricsAll = ['Payout', 'Revenue', 'Click', 'CVR', 'eCPC'];
+
+  const dimOptions = useMemo(() => {
+    const fmt = dimKey === 'Offer' ? extractOfferId : (dimKey === 'Pub ID' ? getPubLabel : (s => s));
+    const unique = new Set(data.map(d => d[dimKey]).filter(Boolean));
+    return Array.from(unique).sort().map(v => ({ label: fmt(v), value: v }));
+  }, [data, dimKey]);
+
+  const topItems = useMemo(() => {
+    const totals = {}; data.forEach(d => { const v = d[dimKey]; if (!v) return; totals[v] = (totals[v] || 0) + (Number(d.Revenue) || 0); });
+    return Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
+  }, [data, dimKey]);
+
+  const items = selectedItems.length > 0 ? selectedItems.slice(0, 5) : topItems;
+
+  const chartData = useMemo(() => {
+    const fmt = dimKey === 'Pub ID' ? getPubLabel : (dimKey === 'Offer' ? extractOfferId : (s => s));
+    const byDate = {};
+    data.forEach(d => {
+      const raw = d[dimKey]; if (!raw || !items.includes(raw)) return;
+      const date = d.Date; if (!byDate[date]) byDate[date] = {};
+      if (!byDate[date][raw]) byDate[date][raw] = { payout: 0, rev: 0, click: 0, cbconv: 0 };
+      byDate[date][raw].payout += (Number(d.Payout) || 0);
+      byDate[date][raw].rev += (Number(d.Revenue) || 0);
+      byDate[date][raw].click += (Number(d.Click) || 0);
+      byDate[date][raw].cbconv += (Number(d['Callback Conversion']) || 0);
+    });
+    const sortedDates = Object.keys(byDate).sort((a, b) => String(a).localeCompare(String(b)));
+    const chartRows = sortedDates.map(date => {
+      const row = { date };
+      items.forEach(item => {
+        const s = byDate[date]?.[item];
+        if (s) {
+          row[item + ' Payout'] = s.payout;
+          row[item + ' Revenue'] = s.rev;
+          row[item + ' Click'] = s.click;
+          row[item + ' CVR'] = s.click > 0 ? (s.cbconv / s.click) * 100 : 0;
+          row[item + ' eCPC'] = s.click > 0 ? (s.payout / s.click) * 1000 : 0;
+        }
+      });
+      return row;
+    });
+    const activeKeys = [];
+    const colors = generateColors(items.length * activeMetrics.length);
+    let ci = 0;
+    items.forEach(item => {
+      activeMetrics.forEach(m => {
+        activeKeys.push(item + ' ' + m);
+        ci++;
+      });
+    });
+    const mc = activeKeys.map((k, i) => {
+      const parts = k.split(' ');
+      const itemName = fmt(parts.slice(0, -1).join(' '));
+      return { key: k, label: itemName + ' ' + parts[parts.length - 1], color: colors[i % colors.length] };
+    });
+    return { data: chartRows, activeMetrics: activeKeys, metricsConfig: mc };
+  }, [data, dimKey, items, activeMetrics]);
+
+  const toggleMetric = (m) => {
+    setActiveMetrics(prev => prev.includes(m) ? (prev.length > 1 ? prev.filter(k => k !== m) : prev) : [...prev, m]);
+  };
+
+  return (
+    <div className="space-y-6 w-full" style={{minHeight: 'calc(100vh - 200px)'}}>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-4">
+        <div className="flex gap-2 bg-slate-100 p-1 rounded-xl self-start">
+          {dims.map(d => (
+            <button key={d} onClick={() => { setDimKey(d); setSelectedItems([]); }}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${dimKey === d ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{d === 'Pub ID' ? '渠道' : d === 'Advertiser ID' ? '广告主' : d === 'Package Name' ? '包名' : 'Offer'}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="text-[10px] font-black text-slate-400 uppercase">选择对象（≤5）</span>
+          <div className="flex-1 max-w-xl"><MultiSelect options={dimOptions} value={selectedItems} onChange={setSelectedItems} placeholder={selectedItems.length === 0 ? '留空=Top5营收···' : ''}/></div>
+        </div>
+        <div className="flex gap-2 bg-slate-50 p-1.5 rounded-xl self-start flex-wrap">
+          {metricsAll.map(m => {
+            const isActive = activeMetrics.includes(m);
+            return (<button key={m} onClick={() => toggleMetric(m)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${isActive ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{m}</button>);
+          })}
+        </div>
+      </div>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col min-h-[450px]">
+        <div className="flex items-center gap-2 mb-3 shrink-0">
+          <I name="LineChart" size={16} color="#3b82f6"/>
+          <h3 className="font-black text-slate-700 text-xs uppercase tracking-widest">{dims.find(d=>d===dimKey)? { 'Pub ID': '渠道', 'Advertiser ID': '广告主', 'Package Name': '包名', 'Offer': 'Offer' }[dimKey] : dimKey} 趋势 · {items.length} 对象 · {activeMetrics.length} 指标</h3>
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2 h-12 overflow-y-auto shrink-0">
+          {chartData.metricsConfig.map((cfg, i) => (<div key={i} className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: cfg.color }}></div><span className="text-[10px] font-bold text-slate-500 truncate max-w-[220px]" title={cfg.label}>{cfg.label}</span></div>))}
+        </div>
+        <div className="flex-1 w-full min-h-0">
+          <MultiTrendChart data={chartData.data} activeMetrics={chartData.activeMetrics} metricsConfig={chartData.metricsConfig}/>
         </div>
       </div>
     </div>
@@ -946,7 +1073,8 @@ const CapWarningView = ({ data, onCopy }) => {
 
 const ExclusionView = ({ data, filters, setFilters, onCopy }) => {
   const filtered = useMemo(() => {
-    const map = data.reduce((acc, d) => {
+    const clean = data.filter(d => String(d['Advertiser ID']) !== '130011');
+    const map = clean.reduce((acc, d) => {
       const oid = extractOfferId(d.Offer); if (!acc[oid]) acc[oid] = { id: oid, click: 0, conv: 0, rev: 0 };
       acc[oid].click += (Number(d.Click) || 0); acc[oid].conv += (Number(d.Conversion) || 0); acc[oid].rev += (Number(d.Revenue) || 0); return acc;
     }, {});
@@ -962,6 +1090,7 @@ const ExclusionView = ({ data, filters, setFilters, onCopy }) => {
         <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最大 eCPC</span><input type="number" step="any" value={filters.maxEcpc} onChange={e => setFilters({...filters, maxEcpc: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
         <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最大 Revenue</span><input type="number" step="any" value={filters.maxRevenue} onChange={e => setFilters({...filters, maxRevenue: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
         <button onClick={() => onCopy(filtered.map(o => o.id).join('|'))} className="bg-rose-600 text-white px-4 py-2 rounded-xl text-xs font-bold ml-auto flex items-center gap-2 shadow-sm"><I name="Copy" size={14}/> 复制 ID ({filtered.length})</button>
+        <span className="text-[10px] text-slate-400 font-bold italic">*已屏蔽 adv-130011（Appnext-Imp）</span>
       </div>
       <div className="bg-white rounded-2xl border overflow-hidden shadow-sm">
         <table className="w-full text-left text-sm"><thead className="bg-slate-50 text-[10px] uppercase"><tr><th className="px-6 py-4">Offer ID</th><th className="px-6 py-4">点击</th><th className="px-6 py-4">CVR%</th><th className="px-6 py-4">营收</th></tr></thead>
@@ -1080,8 +1209,8 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
     });
     return pubs.map(pub => {
       const isSameAdv = (pS, aS) => { const cP = pS.replace(/^\d+-/, '').toLowerCase().trim(), cA = aS.replace(/^\d+-/, '').toLowerCase().trim(); return cP === cA || (cP.length > 2 && cA.length > 2 && (cP.includes(cA) || cA.includes(cP))); };
-      const blueOcean = Object.values(globalStats).map(o => ({...o, cvr: o.totalClick > 0 ? (o.totalConv / o.totalClick) * 100 : 0, ecpc: o.totalClick > 0 ? o.totalRev / o.totalClick : 0})).filter(o => !o.byPub[pub] && !isSameAdv(pub, o.advertiserId) && (o.totalRev >= filters.minRevenue) && (o.totalConv >= filters.minConv)).sort((a,b)=>b.totalRev-a.totalRev);
-      const pubOffers = Object.values(localStats[pub]).map(o => ({...o, ecpc: o.click > 0 ? ((o.payout/o.click)*1000) : 0, cvr: o.click > 0 ? ((o.cbconv/o.click)*100) : 0})).filter(o => o.payout >= filters.minPayout && o.ecpc >= filters.minEcpc && o.cvr >= filters.minCvr);
+      const blueOcean = Object.values(globalStats).map(o => ({...o, cvr: o.totalClick > 0 ? (o.totalConv / o.totalClick) * 100 : 0, ecpc: o.totalClick > 0 ? o.totalRev / o.totalClick : 0})).filter(o => !o.byPub[pub] && !isSameAdv(pub, o.advertiserId) && (o.totalRev >= filters.minRevenue) && (o.totalConv >= filters.minConv) && (o.ecpc >= filters.minEcpcBlue) && (o.cvr >= filters.minCvrBlue)).sort((a,b)=>b.totalRev-a.totalRev);
+      const pubOffers = Object.values(localStats[pub]).map(o => ({...o, ecpc: o.click > 0 ? ((o.payout/o.click)*1000) : 0, cvr: o.click > 0 ? ((o.cbconv/o.click)*100) : 0})).filter(o => o.payout >= filters.minPayout && o.ecpc >= filters.minEcpc && o.cvr >= filters.minCvr && o.click >= filters.minClickEcpc);
       return { pub, blueOcean, topEcpc: [...pubOffers].sort((a,b)=>b.ecpc-a.ecpc).slice(0, 20), topCvr: [...pubOffers].sort((a,b)=>b.cvr-a.cvr).slice(0, 20) };
     }).filter(r => r.blueOcean.length > 0 || r.topEcpc.length > 0);
   }, [data, filters]);
@@ -1096,6 +1225,8 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
           <span className="text-[11px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">推荐 offer</span>
           <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最小营收 ($)</span><input type="number" step="any" value={filters.minRevenue} onChange={e => setFilters({...filters, minRevenue: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
           <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最小转化数</span><input type="number" step="any" value={filters.minConv} onChange={e => setFilters({...filters, minConv: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+          <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最小 eCPC</span><input type="number" step="any" value={filters.minEcpcBlue} onChange={e => setFilters({...filters, minEcpcBlue: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
+          <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最小 CVR (%)</span><input type="number" step="any" value={filters.minCvrBlue} onChange={e => setFilters({...filters, minCvrBlue: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-blue-500/20"/></div>
         </div>
         <div className="h-8 w-px bg-slate-200"></div>
         <div className="flex items-center gap-3">
@@ -1103,6 +1234,7 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
           <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最低 Payout ($)</span><input type="number" step="any" value={filters.minPayout} onChange={e => setFilters({...filters, minPayout: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-rose-500/20"/></div>
           <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最低 eCPC</span><input type="number" step="any" value={filters.minEcpc} onChange={e => setFilters({...filters, minEcpc: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-rose-500/20"/></div>
           <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最低 CVR (%)</span><input type="number" step="any" value={filters.minCvr} onChange={e => setFilters({...filters, minCvr: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-emerald-500/20"/></div>
+          <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase mb-1">最低 Click</span><input type="number" step="any" value={filters.minClickEcpc} onChange={e => setFilters({...filters, minClickEcpc: Number(e.target.value)})} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-bold w-24 outline-none focus:ring-2 focus:ring-rose-500/20"/></div>
         </div>
         <div className="ml-auto flex items-center gap-4">
           <div className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2"><I name="Info" size={14}/> 共分析 {data.length} 条原始数据</div>
@@ -1155,12 +1287,12 @@ function App() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [toast, setToast] = useState('');
-  const [dateFrom, setDateFrom] = useState(dayOffset(6));
-  const [dateTo, setDateTo] = useState(dayOffset(0));
+  const [dateFrom, setDateFrom] = useState(dayOffset(7));
+  const [dateTo, setDateTo] = useState(dayOffset(1));
   const [lastRefresh, setLastRefresh] = useState(null);
   const [latestData, setLatestData] = useState({ latest_date: '', latest_created: '' });
   const [unknownIds, setUnknownIds] = useState({ pubs: [], advs: [] });
-  const [filters, setFilters] = useState({ minRevenue: 5, minConv: 20, minClicks: 1000, maxCvr: 0.1, maxEcpc: 0.1, maxRevenue: 1, minPayout: 1, minEcpc: 1, minCvr: 1 });
+  const [filters, setFilters] = useState({ minRevenue: 5, minConv: 20, minClicks: 1000, maxCvr: 0.1, maxEcpc: 0.1,                                       maxRevenue: 1, minPayout: 1, minEcpc: 1, minCvr: 1, minClickEcpc: 100, minEcpcBlue: 1, minCvrBlue: 0.5 });
 
   const loadData = useCallback(async (from, to) => {
     setLoading(true);
@@ -1243,7 +1375,7 @@ function App() {
           ) : (
             <>
               {activeTab === 'dashboard' && <DashboardView data={rawData} />}
-              {activeTab === 'trend' && <TrendAnalysisView data={rawData} />}
+              {activeTab === 'trend' && <TrendExplorerView data={rawData} />}
               {activeTab === 'packageScout' && <PackageScoutView data={rawData} />}
               {activeTab === 'anomaly' && <AnomalyView data={rawData} onCopy={t => {copyToClipboard(t); showToast("复制成功");}} />}
               {activeTab === 'capWarning' && <CapWarningView data={rawData} onCopy={t => {copyToClipboard(t); showToast("预警ID已复制");}} />}
