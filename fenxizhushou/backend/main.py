@@ -17,6 +17,8 @@ from cachetools import TTLCache
 load_dotenv()
 
 FEED_CACHE = TTLCache(maxsize=10, ttl=7200)
+SNAPSHOT_DIR = Path(__file__).resolve().parent.parent / "feed_snapshots"
+SNAPSHOT_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="数据分析助手 API")
 
@@ -169,11 +171,46 @@ def load_pub_config():
             result[k] = {"name": v.get("name", ""), "token": v.get("token", "")}
     return result
 
+@app.get("/api/feed-snapshot")
+def get_feed_snapshot(pub_id: str = Query(...)):
+    path = SNAPSHOT_DIR / f"{pub_id}.json"
+    if not path.exists():
+        return {"exists": False}
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    return {"exists": True, "timestamp": data.get("timestamp"), "count": len(data.get("offers", []))}
+
+@app.post("/api/feed-snapshot")
+async def update_feed_snapshot(pub_id: str = Query(...)):
+    pub_config = load_pub_config()
+    info = pub_config.get(pub_id, {})
+    token = info.get("token", "") if isinstance(info, dict) else ""
+    if not token:
+        return {"error": "no token"}
+    FEED_CACHE.clear()
+    offers = await fetch_feed_all(pub_id, token)
+    if isinstance(offers, dict) and "error" in offers:
+        return offers
+    path = SNAPSHOT_DIR / f"{pub_id}.json"
+    data = {"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"), "offers": offers}
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+    return {"exists": True, "timestamp": data["timestamp"], "count": len(offers)}
+
 async def fetch_feed_all(pub_id: str, token: str):
-    """全量拉取 Feed API，2h 缓存"""
+    """全量拉取 Feed API，优先用快照，24h 内有效"""
     cache_key = f"feed_{pub_id}"
     if cache_key in FEED_CACHE:
         return FEED_CACHE[cache_key]
+    # 尝试读快照
+    snap_path = SNAPSHOT_DIR / f"{pub_id}.json"
+    if snap_path.exists():
+        with open(snap_path, encoding="utf-8") as f:
+            data = json.load(f)
+        ts = datetime.strptime(data["timestamp"], "%Y-%m-%d %H:%M")
+        if (datetime.now() - ts).total_seconds() < 86400:
+            FEED_CACHE[cache_key] = data["offers"]
+            return data["offers"]
 
     url = "http://doubleint.api.offerplus.net/feed/"
     page = 1
@@ -218,12 +255,14 @@ def build_index(offers):
     return idx
 
 
-def match_offers_impl(pairs, feed_data, conn):
+def match_offers_impl(pairs, feed_data, conn, date_from, date_to):
     """三态匹配 + DB 指标查询"""
+    if not date_to:
+        date_to = datetime.utcnow().strftime("%Y%m%d")
+    if not date_from:
+        date_from = (datetime.strptime(date_to, "%Y%m%d") - timedelta(days=7)).strftime("%Y%m%d")
     idx = build_index(feed_data)
     results = []
-
-    # 收集所有 match 到的 offer_id
     all_matched_ids = []
     for pair in pairs:
         pkg = (pair.get("pkg","") or "").strip()
@@ -241,35 +280,37 @@ def match_offers_impl(pairs, feed_data, conn):
                         entry["other_offers"].append(f"{oid}-{c}")
         results.append(entry)
 
-    # 批量查 DB 指标 + adv name
     id_to_metrics = {}
     id_to_adv = {}
+    cur = conn.cursor(pymysql.cursors.DictCursor)
+
+    # 1. 查指标（按日期范围）
     if all_matched_ids:
         placeholders = ",".join(["%s"] * len(all_matched_ids))
-        cur = conn.cursor(pymysql.cursors.DictCursor)
-        cur.execute(f"""SELECT adgroup_id, src, SUM(revenue) as rev, SUM(payout) as pay, SUM(click) as clk,
+        cur.execute(f"""SELECT adgroup_id, SUM(revenue) as rev, SUM(payout) as pay, SUM(click) as clk,
                         SUM(conversion) as conv
                         FROM offerplus_detail_report
                         WHERE adgroup_id IN ({placeholders})
                         AND date >= %s AND date <= %s
-                        GROUP BY adgroup_id, src""",
-                    (*all_matched_ids, (datetime.utcnow() - timedelta(days=7)).strftime("%Y%m%d"),
-                     datetime.utcnow().strftime("%Y%m%d")))
+                        GROUP BY adgroup_id""",
+                    (*all_matched_ids, date_from, date_to))
         for row in cur.fetchall():
             oid = str(row["adgroup_id"])
             clk = int(row["clk"] or 0)
-            rev = float(row["rev"] or 0)
-            pay = float(row["pay"] or 0)
-            conv = int(row["conv"] or 0)
             id_to_metrics[oid] = {
-                "rev": round(rev, 2),
+                "rev": round(float(row["rev"] or 0), 2),
                 "click": clk,
-                "ecpc": round((pay / clk) * 1000 if clk > 0 else 0, 2),
-                "cvr": round((conv / clk) * 100 if clk > 0 else 0, 2),
+                "ecpc": round((float(row["pay"] or 0) / clk) * 1000 if clk > 0 else 0, 2),
+                "cvr": round((float(row["conv"] or 0) / clk) * 100 if clk > 0 else 0, 2),
             }
-            id_to_adv[oid] = str(row["src"] or "")
 
-    # 加载 adv name 映射
+    # 2. 查 Adv 名（不限日期，取最先出现的 src）
+    if all_matched_ids:
+        ids_str = ",".join(all_matched_ids)
+        cur.execute(f"SELECT adgroup_id, MIN(updated_at), src FROM offerplus_detail_report WHERE adgroup_id IN ({ids_str}) GROUP BY adgroup_id")
+        for row in cur.fetchall():
+            id_to_adv[str(row["adgroup_id"])] = str(row["src"] or "")
+
     adv_map = {}
     try:
         am_path = Path(__file__).resolve().parent.parent / "adv_mapping.json"
@@ -279,7 +320,6 @@ def match_offers_impl(pairs, feed_data, conn):
     except Exception:
         pass
 
-    # 填充 metrics
     for entry in results:
         for i, oid in enumerate(entry["offers"]):
             m = id_to_metrics.get(oid, {})
@@ -288,19 +328,19 @@ def match_offers_impl(pairs, feed_data, conn):
             entry["offers"][i] = {"id": oid, "adv": adv_name, "rev": m.get("rev", 0), "click": m.get("click", 0),
                                   "ecpc": m.get("ecpc", 0), "cvr": m.get("cvr", 0)}
 
-    # 统计
     stats = {"total": len(results), "green": sum(1 for r in results if r["status"] == "green"),
              "yellow": sum(1 for r in results if r["status"] == "yellow"),
              "red": sum(1 for r in results if r["status"] == "red")}
     return results, stats
 
 
-def generate_excel(results, stats):
+def generate_excel(results, stats, sep=",", checked_ids=None):
     import openpyxl
     from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "匹配结果"
+    checked = set(checked_ids or [])
 
     header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF", size=10)
@@ -310,7 +350,7 @@ def generate_excel(results, stats):
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
                          top=Side(style='thin'), bottom=Side(style='thin'))
 
-    headers = ["包名", "GEO", "状态", "Offer ID", "7D Revenue", "7D Click", "eCPC", "CVR", "其他国家offer id"]
+    headers = ["包名", "GEO", "状态", "Offer ID", "其他国家Offer ID"]
     for c, h in enumerate(headers, 1):
         cell = ws.cell(row=1, column=c, value=h)
         cell.fill = header_fill
@@ -323,33 +363,25 @@ def generate_excel(results, stats):
         fill = green_fill if r["status"] == "green" else yellow_fill if r["status"] == "yellow" else red_fill
         status_text = "🟢" if r["status"] == "green" else "🟡" if r["status"] == "yellow" else "🔴"
         if r["status"] == "green":
-            for o in r["offers"]:
-                vals = [r["pkg"], r["geo"], status_text, o["id"], o["rev"], o["click"], o["ecpc"], f'{o["cvr"]}%', ""]
-                for c, v in enumerate(vals, 1):
-                    cell = ws.cell(row=row, column=c, value=v)
-                    cell.fill = fill
-                    cell.border = thin_border
-                    cell.alignment = Alignment(horizontal='center')
-                row += 1
+            # 如果传了 checked_ids，只取已勾选的
+            ids = [o["id"] for o in r["offers"] if not checked_ids or o["id"] in checked]
+            oid_str = sep.join(ids) if ids else ""
         else:
-            other = ", ".join(r["other_offers"]) if r["other_offers"] else ""
-            vals = [r["pkg"], r["geo"], status_text, "无匹配" if r["status"] == "red" else "", "", "", "", "", other]
-            for c, v in enumerate(vals, 1):
-                cell = ws.cell(row=row, column=c, value=v)
-                cell.fill = fill
-                cell.border = thin_border
-                cell.alignment = Alignment(horizontal='center')
-            row += 1
+            oid_str = "无匹配" if r["status"] == "red" else ""
+        other = ", ".join(r["other_offers"]) if r["other_offers"] else ""
+        vals = [r["pkg"], r["geo"], status_text, oid_str, other]
+        for c, v in enumerate(vals, 1):
+            cell = ws.cell(row=row, column=c, value=v)
+            cell.fill = fill
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal='center')
+        row += 1
 
     ws.column_dimensions['A'].width = 48
     ws.column_dimensions['B'].width = 10
     ws.column_dimensions['C'].width = 8
-    ws.column_dimensions['D'].width = 30
-    ws.column_dimensions['E'].width = 15
-    ws.column_dimensions['F'].width = 12
-    ws.column_dimensions['G'].width = 10
-    ws.column_dimensions['H'].width = 8
-    ws.column_dimensions['I'].width = 65
+    ws.column_dimensions['D'].width = 40
+    ws.column_dimensions['E'].width = 65
 
     # 统计 sheet
     ws2 = wb.create_sheet("统计")
@@ -371,46 +403,47 @@ def generate_excel(results, stats):
 @app.post("/api/match-offers")
 @app.get("/api/match-offers")
 async def match_offers_endpoint(pub_id: str = Query(...), request: Request = None):
-    # Parse input
     if request and request.method == "POST":
         body = await request.json()
         pairs = body.get("pairs", [])
         fmt = body.get("format", "")
+        date_from = body.get("date_from", "")
+        date_to = body.get("date_to", "")
+        sep = body.get("sep", ",")
+        checked_ids = body.get("checked_ids", [])
     else:
-        # GET for Excel download
         pairs_raw = request.query_params.get("pairs", "[]") if request else "[]"
         try:
             pairs = json.loads(pairs_raw)
         except Exception:
             pairs = []
         fmt = request.query_params.get("format", "") if request else ""
+        date_from = request.query_params.get("date_from", "") if request else ""
+        date_to = request.query_params.get("date_to", "") if request else ""
+        sep = request.query_params.get("sep", ",") if request else ","
+        checked_ids = request.query_params.get("checked_ids", "").split(",") if request else []
 
     if not pub_id:
         return {"error": "pub_id required"}
 
-    # Get token
     pub_config = load_pub_config()
     pub_info = pub_config.get(pub_id, {})
     token = pub_info.get("token", "") if isinstance(pub_info, dict) else ""
-
     if not token:
         return {"error": f"pub_id {pub_id} has no token configured"}
 
-    # Fetch Feed
     offers = await fetch_feed_all(pub_id, token)
     if isinstance(offers, dict) and "error" in offers:
         return offers
 
-    # Match
     conn = get_conn()
     try:
-        results, stats = match_offers_impl(pairs, offers, conn)
+        results, stats = match_offers_impl(pairs, offers, conn, date_from, date_to)
     finally:
         conn.close()
 
-    # Export Excel
     if fmt == "xlsx":
-        buf = generate_excel(results, stats)
+        buf = generate_excel(results, stats, sep, checked_ids)
         filename = f"offer_match_{pub_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                  headers={"Content-Disposition": f"attachment; filename={filename}"})
