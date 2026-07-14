@@ -705,9 +705,9 @@ const TrendExplorerView = ({ data }) => {
               <div key={dk} className="flex items-center gap-1.5">
                 <span className="text-[10px] text-slate-400">{dimLabels[dk]}:</span>
                 <SearchSelect options={crossOptions[dk] || []} value={crossFilters[dk] || ''} onChange={v => setCrossFilters(prev => { const nx = { ...prev }; nx[dk] = v; return nx; })}/>
-              </div>
-            ))}
-          </div>
+        </div>
+      );}
+    </div>
         )}
         <div className="flex gap-2 bg-slate-50 p-1.5 rounded-xl self-start flex-wrap">
           {metricsAll.map(m => {
@@ -1236,7 +1236,9 @@ const AdvTopView = ({ data, onCopy }) => {
             </div>
           </div>
         </div>
-      ))}
+      );
+}
+)}
     </div>
   );
 };
@@ -1317,7 +1319,9 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
           <div className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2"><I name="Info" size={14}/> 共分析 {data.length} 条原始数据</div>
         </div>
       </div>
-      {recommendations.map(res => (
+      {recommendations.map(res => {
+      const sorted = [...res.blueOcean].sort((a, b) => sortMode === 'ecpc' ? b.ecpc - a.ecpc : sortMode === 'cvr' ? b.cvr - a.cvr : b.totalRev - a.totalRev);
+      return (
         <div key={res.pub} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6">
           <div className="flex items-center gap-3 mb-6 border-l-4 border-blue-600 pl-4"><h3 className="text-lg font-black text-slate-800">Channel: <span className="text-blue-600">{getPubLabel(res.pub)}</span></h3></div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -1331,10 +1335,10 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
                     ))}
                   </div>
                 </div>
-                <div className="flex gap-2"><button onClick={() => copyIds(res.blueOcean)} className="bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-slate-50">复制 ID</button><button onClick={() => copyFormatted(res.blueOcean)} className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200">复制格式</button></div>
+                <div className="flex gap-2"><button onClick={() => copyIds(sorted)} className="bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-slate-50">复制 ID</button><button onClick={() => copyFormatted(sorted)} className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200">复制格式</button></div>
               </div>
               <div className="flex flex-wrap gap-2">
-                {[...res.blueOcean].sort((a,b) => sortMode === 'ecpc' ? b.ecpc - a.ecpc : sortMode === 'cvr' ? b.cvr - a.cvr : b.totalRev - a.totalRev).slice(0, 12).map((o, i) => (<div key={i} className="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-2"><span>{o.id}</span><span className="text-slate-300">|</span><span className={sortMode === 'ecpc' ? 'text-rose-600' : sortMode === 'cvr' ? 'text-emerald-600' : 'text-emerald-600'}>${sortMode === 'ecpc' ? o.ecpc.toFixed(2) : sortMode === 'cvr' ? o.cvr.toFixed(2) + '%' : o.totalRev.toFixed(0)}</span></div>))}
+                {sorted.slice(0, 12).map((o, i) => (<div key={i} className="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-2"><span>{o.id}</span><span className="text-slate-300">|</span><span className={sortMode === 'ecpc' ? 'text-rose-600' : sortMode === 'cvr' ? 'text-emerald-600' : 'text-emerald-600'}>${sortMode === 'ecpc' ? o.ecpc.toFixed(2) : sortMode === 'cvr' ? o.cvr.toFixed(2) + '%' : o.totalRev.toFixed(0)}</span></div>))}
                 {res.blueOcean.length > 12 && <div className="px-3 py-1.5 text-xs font-bold text-slate-400 flex items-center">+{res.blueOcean.length - 12} more...</div>}
                 {res.blueOcean.length === 0 && <div className="text-slate-400 text-xs italic">暂无推荐</div>}
               </div>
