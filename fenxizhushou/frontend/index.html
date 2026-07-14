@@ -1249,7 +1249,7 @@ const IdJoinerView = () => {
     const ids = []; const seen = new Set();
     tokens.forEach(t => {
       const tid = extractOfferId(t.trim());
-      if (tid && /^\d+$/.test(tid) && !seen.has(tid)) { seen.add(tid); ids.push(tid); }
+      if (tid && /^\d{3,}$/.test(tid) && !seen.has(tid)) { seen.add(tid); ids.push(tid); }
     });
     return ids;
   }, [input]);
