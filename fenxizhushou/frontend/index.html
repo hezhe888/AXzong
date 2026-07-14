@@ -283,6 +283,48 @@ const MultiSelect = ({ options, value = [], onChange, placeholder = "Select...",
   );
 };
 
+const SearchSelect = ({ options, value, onChange, placeholder = '全部' }) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef(null);
+  useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h);
+  }, []);
+  const selected = options.find(o => o.value === value);
+  const filtered = useMemo(() => {
+    if (!search) return options.slice(0, 50);
+    return options.filter(o => String(o.label).toLowerCase().includes(search.toLowerCase())).slice(0, 50);
+  }, [options, search]);
+  return (
+    <div className="relative" ref={ref}>
+      <div onClick={() => { setOpen(!open); setSearch(''); }} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold cursor-pointer hover:border-orange-400 min-w-[120px] flex items-center gap-1">
+        <span className={`truncate ${selected ? 'text-slate-700' : 'text-slate-400'}`}>{selected ? selected.label : placeholder}</span>
+        <I name="ChevronRight" size={12} className={`text-slate-400 ml-auto shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}/>
+      </div>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 w-56">
+          <div className="p-2 border-b border-slate-50">
+            <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 rounded-lg">
+              <I name="Search" size={12} className="text-slate-400"/>
+              <input autoFocus className="bg-transparent text-xs font-bold text-slate-700 outline-none w-full" placeholder="搜索..." value={search} onChange={e => setSearch(e.target.value)}/>
+              {search && <button onClick={() => setSearch('')}><I name="X" size={10} className="text-slate-400"/></button>}
+            </div>
+          </div>
+          <div className="max-h-48 overflow-y-auto p-1">
+            {filtered.map(o => (
+              <button key={o.value} onClick={() => { onChange(o.value); setOpen(false); }}
+                className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${o.value === value ? 'bg-orange-50 text-orange-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SimpleBarChart = ({ data, dataKey, labelKey, color, unit = '', title, colors }) => {
   if (!data || data.length === 0) return <div className="text-slate-400 text-xs italic">无数据</div>;
   const sortedData = [...data].sort((a, b) => b[dataKey] - a[dataKey]);
@@ -562,9 +604,9 @@ const TrendExplorerView = ({ data }) => {
   const dimLabels = { 'Pub ID': '渠道', 'Advertiser ID': '广告主', 'Package Name': '包名', 'Offer': 'Offer' };
   const [dimKey, setDimKey] = useState('Pub ID');
   const [selectedItems, setSelectedItems] = useState([]);
-  const [activeMetrics, setActiveMetrics] = useState(['Payout', 'Revenue']);
+  const [activeMetrics, setActiveMetrics] = useState(['Revenue']);
   const [crossFilters, setCrossFilters] = useState({});
-  const metricsAll = ['Payout', 'Revenue', 'Click', 'CVR', 'eCPC'];
+  const metricsAll = ['Revenue', 'Payout', 'Click', 'CVR', 'eCPC'];
 
   const getFmt = (dk) => dk === 'Offer' ? extractOfferId : (dk === 'Pub ID' ? getPubLabel : (dk === 'Advertiser ID' ? getAdvLabel : (s => s)));
 
@@ -574,7 +616,7 @@ const TrendExplorerView = ({ data }) => {
     return Array.from(unique).sort().map(v => ({ label: fmt(v), value: v }));
   }, [data, dimKey]);
 
-  const crossDims = dims.filter(d => d !== dimKey);
+  const crossDims = dims;
 
   const crossOptions = useMemo(() => {
     const opts = {};
@@ -661,9 +703,7 @@ const TrendExplorerView = ({ data }) => {
             {crossDims.map(dk => (
               <div key={dk} className="flex items-center gap-1.5">
                 <span className="text-[10px] text-slate-400">{dimLabels[dk]}:</span>
-                <select value={crossFilters[dk] || ''} onChange={e => setCrossFilters(prev => ({ ...prev, [dk]: e.target.value }))} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-orange-500/20">
-                  {(crossOptions[dk] || []).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <SearchSelect options={crossOptions[dk] || []} value={crossFilters[dk] || ''} onChange={v => setCrossFilters(prev => { const nx = { ...prev }; nx[dk] = v; return nx; })}/>
               </div>
             ))}
           </div>
@@ -673,6 +713,9 @@ const TrendExplorerView = ({ data }) => {
             const isActive = activeMetrics.includes(m);
             return (<button key={m} onClick={() => toggleMetric(m)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${isActive ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{m}</button>);
           })}
+          <span className="w-px h-5 bg-slate-200 mx-1"></span>
+          <button onClick={() => { setSelectedItems([]); setActiveMetrics(['Revenue']); setCrossFilters({}); }}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors"><I name="Trash2" size={12}/> 清空</button>
         </div>
       </div>
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col min-h-[450px]">
@@ -826,7 +869,7 @@ const PackageScoutView = ({ data }) => {
   const filtered = useMemo(() => packageGroups.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())), [packageGroups, searchTerm]);
   useEffect(() => { if (packageGroups.length > 0 && !selectedPkg) setSelectedPkg(packageGroups[0].name); }, [packageGroups]);
   const active = useMemo(() => packageGroups.find(g => g.name === selectedPkg), [packageGroups, selectedPkg]);
-  const advMetrics = useMemo(() => active ? Object.values(active.advertisers).map(adv => ({ ...adv, ecpc: adv.click > 0 ? (adv.rev / adv.click) * 1000 : 0, cvr: adv.click > 0 ? (adv.conv / adv.click) * 100 : 0 })) : [], [active]);
+  const advMetrics = useMemo(() => active ? Object.values(active.advertisers).map(adv => ({ ...adv, id: getAdvLabel(adv.id), ecpc: adv.click > 0 ? (adv.rev / adv.click) * 1000 : 0, cvr: adv.click > 0 ? (adv.conv / adv.click) * 100 : 0 })) : [], [active]);
   if (packageGroups.length === 0) return <div className="h-96 flex flex-col items-center justify-center text-slate-400 gap-4"><I name="Package" size={48} className="opacity-20"/><p className="font-bold">暂无"多广告主竞争"的包名数据</p></div>;
   return (
     <div className="flex h-[calc(100vh-210px)] gap-6">
