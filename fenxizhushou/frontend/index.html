@@ -706,8 +706,8 @@ const TrendExplorerView = ({ data }) => {
                 <span className="text-[10px] text-slate-400">{dimLabels[dk]}:</span>
                 <SearchSelect options={crossOptions[dk] || []} value={crossFilters[dk] || ''} onChange={v => setCrossFilters(prev => { const nx = { ...prev }; nx[dk] = v; return nx; })}/>
         </div>
-      );}
-    </div>
+            ))}
+          </div>
         )}
         <div className="flex gap-2 bg-slate-50 p-1.5 rounded-xl self-start flex-wrap">
           {metricsAll.map(m => {
