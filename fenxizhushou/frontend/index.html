@@ -126,8 +126,10 @@ const fetchPubNames = async () => {
 const getPubLabel = (mid) => {
   const m = String(mid);
   if (m === 'jk-all') return 'JK综合';
-  const name = pubNameMap[m];
-  return name ? `${m}-${name}` : m;
+  const v = pubNameMap[m];
+  if (!v) return m;
+  if (typeof v === 'string') return `${m}-${v}`;
+  return `${m}-${v.name}`;
 };
 
 const getAdvLabel = (src) => {
@@ -1307,6 +1309,134 @@ const IdJoinerView = () => {
   );
 };
 
+const OfferMatchView = () => {
+  const [pairs, setPairs] = useState('');
+  const [pubId, setPubId] = useState('130119');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [sepMode, setSepMode] = useState('|');
+  const pubOptions = useMemo(() => {
+    return Object.entries(pubNameMap).map(([k, v]) => ({ label: typeof v === 'string' ? `${k}-${v}` : `${k}-${v.name}`, value: k }));
+  }, []);
+  const getToken = (pid) => { const info = pubNameMap[pid]; return info && typeof info === 'object' ? (info.token || '') : ''; };
+  const parsePairs = () => pairs.split(/[\r\n]+/).map(l => { const p = l.split(/\t+/); return { pkg: (p[0] || '').trim(), geo: (p[1] || '').trim() }; }).filter(x => x.pkg && x.geo);
+
+  const doMatch = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/match-offers?pub_id=' + pubId, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pairs: parsePairs() }) });
+      const data = await res.json();
+      setResult(data);
+      // Default: select all offer IDs
+      const allIds = new Set();
+      (data.matches || []).forEach(m => { if (m.status === 'green') m.offers.forEach(o => allIds.add(o.id)); });
+      setSelectedIds(allIds);
+    } catch (e) { setResult({ error: e.message }); }
+    setLoading(false);
+  };
+
+  const downloadExcel = () => {
+    const params = new URLSearchParams({ pub_id: pubId, format: 'xlsx', pairs: JSON.stringify(parsePairs()) });
+    window.open('/api/match-offers?' + params.toString(), '_blank');
+  };
+
+  const handleCheck = (oid, checked) => {
+    setSelectedIds(prev => { const next = new Set(prev); checked ? next.add(oid) : next.delete(oid); return next; });
+  };
+  const toggleAll = () => {
+    if (!result) return;
+    const allIds = new Set(); (result.matches || []).forEach(m => { if (m.status === 'green') m.offers.forEach(o => allIds.add(o.id)); });
+    if (selectedIds.size === allIds.size && allIds.size > 0) setSelectedIds(new Set());
+    else setSelectedIds(allIds);
+  };
+  const copyIds = () => { const ids = []; (result?.matches || []).forEach(m => m.offers.forEach(o => { if (selectedIds.has(o.id)) ids.push(o.id); })); copyToClipboard(ids.join(sepMode === '|' ? '|' : ',')); };
+  const copyFmt = () => {
+    const lines = [];
+    (result?.matches || []).forEach(m => m.offers.forEach(o => { if (selectedIds.has(o.id)) lines.push(`${o.id}|${m.pkg}|${m.geo}`); }));
+    copyToClipboard(lines.join('\n'));
+  };
+
+  return (
+    <div className="space-y-6 w-full" style={{minHeight: 'calc(100vh - 200px)'}}>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-4">
+        <h3 className="font-black text-slate-800 text-lg flex items-center gap-2"><I name="Search" size={20} color="#8b5cf6"/> offer匹配</h3>
+        <div className="flex gap-4 items-center flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black text-slate-400 uppercase">Pub</span>
+            <select value={pubId} onChange={e => setPubId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold outline-none">
+              {pubOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold">Token: <code className="bg-slate-50 px-2 py-0.5 rounded text-slate-500">{getToken(pubId) || '无'}</code></div>
+        </div>
+        <textarea value={pairs} onChange={e => setPairs(e.target.value)} placeholder="每行 包名\tGEO&#10;例：com.globe.gcash.android	PH"
+          className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-mono outline-none focus:ring-2 focus:ring-purple-500/20 resize-y"/>
+        <div className="flex gap-3 items-center">
+          <button onClick={doMatch} disabled={loading} className={`px-4 py-2 rounded-xl text-xs font-bold ${loading ? 'bg-slate-100 text-slate-400' : 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm'}`}>{loading ? '匹配中...' : '开始匹配'}</button>
+          {result && !result.error && <button onClick={downloadExcel} className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">下载Excel</button>}
+        </div>
+        {result && !result.error && result.stats && (
+          <>
+            <div className="flex items-center gap-4 flex-wrap bg-slate-50 rounded-xl p-3">
+              <span className="text-xs font-bold text-slate-500">统计:</span>
+              <span className="text-xs font-bold" style={{color:'#006100'}}>🟢 {result.stats.green}</span>
+              <span className="text-xs font-bold" style={{color:'#9C6500'}}>🟡 {result.stats.yellow}</span>
+              <span className="text-xs font-bold" style={{color:'#9C0006'}}>🔴 {result.stats.red}</span>
+              <span className="text-xs text-slate-400">| 已选 <b className="text-slate-700">{selectedIds.size}</b> ID</span>
+              <div className="flex gap-2 ml-auto">
+                <button onClick={toggleAll} className="px-3 py-1 rounded-lg text-[10px] font-bold bg-slate-200 text-slate-600 hover:bg-slate-300">{selectedIds.size > 0 ? '☐ 清空' : '☑ 全选'}</button>
+                <div className="flex bg-slate-200 p-0.5 rounded-lg">
+                  {['|',','].map(s => <button key={s} onClick={() => setSepMode(s)} className={`px-2 py-0.5 rounded text-[10px] font-bold ${sepMode === s ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600'}`}>{s === '|' ? 'pipe' : '逗号'}</button>)}
+                </div>
+                <button onClick={copyIds} className="px-3 py-1 rounded-lg text-[10px] font-bold bg-slate-700 text-white hover:bg-slate-800">复制ID</button>
+                <button onClick={copyFmt} className="px-3 py-1 rounded-lg text-[10px] font-bold bg-blue-600 text-white hover:bg-blue-700">复制格式</button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead><tr className="bg-slate-100 text-[10px] font-black text-slate-500 uppercase"><th className="px-3 py-2">包名</th><th className="px-3 py-2">GEO</th><th className="px-3 py-2">状态</th><th className="px-3 py-2">☑</th><th className="px-3 py-2">Offer ID</th><th className="px-3 py-2">Rev</th><th className="px-3 py-2">Click</th><th className="px-3 py-2">eCPC</th><th className="px-3 py-2">CVR</th></tr></thead>
+                <tbody>
+                  {result.matches.map((m, mi) => {
+                    const fill = m.status === 'green' ? '#C6EFCE' : m.status === 'yellow' ? '#FFEB9C' : '#FFC7CE';
+                    const statusText = m.status === 'green' ? '🟢' : m.status === 'yellow' ? '🟡' : '🔴';
+                    if (m.status === 'green' && m.offers.length > 0) {
+                      return m.offers.map((o, oi) => (
+                        <tr key={`${mi}-${oi}`} style={{backgroundColor: fill}}>
+                          {oi === 0 && <td rowSpan={m.offers.length} className="px-3 py-2 font-bold text-xs">{m.pkg}</td>}
+                          {oi === 0 && <td rowSpan={m.offers.length} className="px-3 py-2 font-bold text-xs text-center">{m.geo}</td>}
+                          {oi === 0 && <td rowSpan={m.offers.length} className="px-3 py-2 text-center">{statusText}</td>}
+                          <td className="px-3 py-2 text-center"><input type="checkbox" checked={selectedIds.has(o.id)} onChange={e => handleCheck(o.id, e.target.checked)}/></td>
+                          <td className="px-3 py-2 font-bold text-xs">{o.id}<span className="text-slate-400 font-normal">({o.adv})</span></td>
+                          <td className="px-3 py-2 text-xs font-mono">${o.rev}</td>
+                          <td className="px-3 py-2 text-xs font-mono">{o.click}</td>
+                          <td className="px-3 py-2 text-xs font-mono text-rose-600">${o.ecpc}</td>
+                          <td className="px-3 py-2 text-xs font-mono text-emerald-600">{o.cvr}%</td>
+                        </tr>
+                      ));
+                    }
+                    return (
+                      <tr key={mi} style={{backgroundColor: fill}}>
+                        <td className="px-3 py-2 font-bold text-xs">{m.pkg}</td>
+                        <td className="px-3 py-2 font-bold text-xs text-center">{m.geo}</td>
+                        <td className="px-3 py-2 text-center">{statusText}</td>
+                        <td className="px-3 py-2"></td>
+                        <td className="px-3 py-2 font-bold text-xs">{m.status === 'red' ? '无匹配' : '—'}</td>
+                        <td className="px-3 py-2 text-xs text-slate-400" colSpan={4}>{m.other_offers.length > 0 ? '其他国家: ' + m.other_offers.join(', ') : ''}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+        {result && result.error && <div className="text-rose-600 font-bold text-sm">{result.error}</div>}
+      </div>
+    </div>
+  );
+};
+
 const RankingView = ({ data, onCopy }) => {
   const topOffers = useMemo(() => {
     const grouped = data.reduce((acc, d) => { const k = d.Offer || 'Unknown'; acc[k] = (acc[k] || 0) + (Number(d.Revenue) || 0); return acc; }, {});
@@ -1484,7 +1614,7 @@ function App() {
     loadData(from, to);
   };
 
-  const tabLabel = { dashboard: "总览看板", trend: "趋势分析", packageScout: "包名透视", anomaly: "异常监控", capWarning: "Cap预警", exclusion: "每日剔除", expansion: "拓量蓝海", advtop: "adv-top", joiner: "拼接id", ranking: "绩效排行" };
+  const tabLabel = { dashboard: "总览看板", trend: "趋势分析", packageScout: "包名透视", anomaly: "异常监控", capWarning: "Cap预警", exclusion: "每日剔除", expansion: "拓量蓝海", advtop: "adv-top", joiner: "拼接id", matcher: "offer匹配", ranking: "绩效排行" };
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] text-slate-700 overflow-hidden font-sans">
@@ -1501,6 +1631,7 @@ function App() {
           <NavItem iconName="Compass" label="拓量蓝海" active={activeTab==='expansion'} onClick={()=>setActiveTab('expansion')}/>
           <NavItem iconName="Zap" label="adv-top" active={activeTab==='advtop'} onClick={()=>setActiveTab('advtop')}/>
           <NavItem iconName="Copy" label="拼接id" active={activeTab==='joiner'} onClick={()=>setActiveTab('joiner')}/>
+          <NavItem iconName="Search" label="offer匹配" active={activeTab==='matcher'} onClick={()=>setActiveTab('matcher')}/>
           <NavItem iconName="Award" label="绩效排行" active={activeTab==='ranking'} onClick={()=>setActiveTab('ranking')}/>
         </nav>
         {lastRefresh && <div className="px-4 py-3 border-t text-[10px] text-slate-400 font-bold space-y-1"><div className="flex items-center gap-1.5"><I name="CheckCircle2" size={12} color="#10b981"/> 刷新: {lastRefresh.toLocaleTimeString()}</div>{latestData.latest_date && <div className="flex items-center gap-1.5"><I name="Calendar" size={12} color="#3b82f6"/> 数据至: {latestData.latest_date.slice(4,6)}月{latestData.latest_date.slice(6,8)}日 {latestData.latest_created ? latestData.latest_created.slice(11,19) : ''}</div>}</div>}
@@ -1509,7 +1640,7 @@ function App() {
         <header className="h-16 px-8 flex items-center bg-white border-b shrink-0 justify-between">
           <h2 className="font-bold text-slate-800 text-lg uppercase tracking-widest">{tabLabel[activeTab]}</h2>
         </header>
-        {activeTab !== 'joiner' && (<>
+        {activeTab !== 'joiner' && activeTab !== 'matcher' && (<>
         <div className="px-8 pt-4 shrink-0">
           <DateRangePicker dateFrom={dateFrom} dateTo={dateTo} onApply={handleDateApply} onRefresh={() => loadData()} loading={loading}/>
           {error && <div className="mt-2 text-rose-500 text-sm font-bold">{error}</div>}
@@ -1540,6 +1671,7 @@ function App() {
               {activeTab === 'expansion' && <ExpansionView data={rawData} filters={filters} setFilters={setFilters} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
               {activeTab === 'advtop' && <AdvTopView data={rawData} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
               {activeTab === 'joiner' && <IdJoinerView />}
+              {activeTab === 'matcher' && <OfferMatchView />}
               {activeTab === 'ranking' && <RankingView data={rawData} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
             </>
           )}

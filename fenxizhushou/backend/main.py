@@ -1,15 +1,22 @@
 import os
 import re
 import json
+import math
+from io import BytesIO
 from pathlib import Path
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import pymysql
-from fastapi import FastAPI, Query
+import httpx
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
+from cachetools import TTLCache
 
 load_dotenv()
+
+FEED_CACHE = TTLCache(maxsize=10, ttl=7200)
 
 app = FastAPI(title="数据分析助手 API")
 
@@ -120,17 +127,7 @@ def get_latest():
 
 @app.get("/api/pubnames")
 def get_pub_names():
-    mapping_str = os.environ.get("PUB_MAPPING", "")
-    if mapping_str:
-        try:
-            return json.loads(mapping_str)
-        except (json.JSONDecodeError, TypeError):
-            pass
-    mapping_path = Path(__file__).resolve().parent.parent / "pub_mapping.json"
-    if mapping_path.exists():
-        with open(mapping_path, encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+    return load_pub_config()
 
 @app.get("/api/advnames")
 def get_adv_names():
@@ -145,6 +142,280 @@ def get_adv_names():
         with open(mapping_path, encoding="utf-8") as f:
             return json.load(f)
     return {}
+
+# ===== Offer 匹配 =====
+
+def load_pub_config():
+    """读取 pub_mapping 并标准化为 {name, token} 格式"""
+    mapping_str = os.environ.get("PUB_MAPPING", "")
+    data = None
+    if mapping_str:
+        try:
+            data = json.loads(mapping_str)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    if data is None:
+        mapping_path = Path(__file__).resolve().parent.parent / "pub_mapping.json"
+        if mapping_path.exists():
+            with open(mapping_path, encoding="utf-8") as f:
+                data = json.load(f)
+    if data is None:
+        return {}
+    result = {}
+    for k, v in data.items():
+        if isinstance(v, str):
+            result[k] = {"name": v, "token": ""}
+        else:
+            result[k] = {"name": v.get("name", ""), "token": v.get("token", "")}
+    return result
+
+async def fetch_feed_all(pub_id: str, token: str):
+    """全量拉取 Feed API，2h 缓存"""
+    cache_key = f"feed_{pub_id}"
+    if cache_key in FEED_CACHE:
+        return FEED_CACHE[cache_key]
+
+    url = "http://doubleint.api.offerplus.net/feed/"
+    page = 1
+    all_offers = []
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(url, params={"pub_id": pub_id, "token": token, "page": 1, "per_page": 1000})
+        data = r.json()
+        if data.get("code") != 0:
+            return {"error": f"Feed API error: {data.get('message', 'unknown')}"}
+        total = int(data["data"]["total"])
+        all_offers.extend(data["data"]["offer"])
+        total_pages = math.ceil(total / 1000)
+        for p in range(2, total_pages + 1):
+            r = await client.get(url, params={"pub_id": pub_id, "token": token, "page": p, "per_page": 1000})
+            d = r.json()
+            if d.get("code") == 0:
+                all_offers.extend(d["data"]["offer"])
+
+    FEED_CACHE[cache_key] = all_offers
+    return all_offers
+
+
+def build_index(offers):
+    """构建 pkg_name -> {geo_code -> [offer_id, ...]}"""
+    idx = {}
+    for o in offers:
+        pkg = (o.get("pkg_name") or "").strip()
+        oid = str(o.get("offer_id", "")).strip()
+        if not pkg or not oid:
+            continue
+        countries = (o.get("country") or "").strip().upper().split("|")
+        if pkg not in idx:
+            idx[pkg] = {}
+        for c in countries:
+            c = c.strip()
+            if not c:
+                continue
+            if c not in idx[pkg]:
+                idx[pkg][c] = []
+            idx[pkg][c].append(oid)
+    return idx
+
+
+def match_offers_impl(pairs, feed_data, conn):
+    """三态匹配 + DB 指标查询"""
+    idx = build_index(feed_data)
+    results = []
+
+    # 收集所有 match 到的 offer_id
+    all_matched_ids = []
+    for pkg, geo in pairs:
+        pkg = (pkg or "").strip()
+        geo = (geo or "").strip().upper()
+        entry = {"pkg": pkg, "geo": geo, "status": "red", "offers": [], "other_offers": []}
+        if pkg in idx:
+            if geo in idx[pkg]:
+                entry["status"] = "green"
+                entry["offers"] = idx[pkg][geo][:3]
+                all_matched_ids.extend(entry["offers"])
+            else:
+                entry["status"] = "yellow"
+                for c, ids in idx[pkg].items():
+                    for oid in ids[:3]:
+                        entry["other_offers"].append(f"{oid}-{c}")
+        results.append(entry)
+
+    # 批量查 DB 指标 + adv name
+    id_to_metrics = {}
+    id_to_adv = {}
+    if all_matched_ids:
+        placeholders = ",".join(["%s"] * len(all_matched_ids))
+        cur = conn.cursor(pymysql.cursors.DictCursor)
+        cur.execute(f"""SELECT adgroup_id, src, SUM(revenue) as rev, SUM(payout) as pay, SUM(click) as clk,
+                        SUM(conversion) as conv
+                        FROM offerplus_detail_report
+                        WHERE adgroup_id IN ({placeholders})
+                        AND date >= %s AND date <= %s
+                        GROUP BY adgroup_id, src""",
+                    (*all_matched_ids, (datetime.utcnow() - timedelta(days=7)).strftime("%Y%m%d"),
+                     datetime.utcnow().strftime("%Y%m%d")))
+        for row in cur.fetchall():
+            oid = str(row["adgroup_id"])
+            clk = int(row["clk"] or 0)
+            rev = float(row["rev"] or 0)
+            pay = float(row["pay"] or 0)
+            conv = int(row["conv"] or 0)
+            id_to_metrics[oid] = {
+                "rev": round(rev, 2),
+                "click": clk,
+                "ecpc": round((pay / clk) * 1000 if clk > 0 else 0, 2),
+                "cvr": round((conv / clk) * 100 if clk > 0 else 0, 2),
+            }
+            id_to_adv[oid] = str(row["src"] or "")
+
+    # 加载 adv name 映射
+    adv_map = {}
+    try:
+        am_path = Path(__file__).resolve().parent.parent / "adv_mapping.json"
+        if am_path.exists():
+            with open(am_path, encoding="utf-8") as f:
+                adv_map = json.load(f)
+    except Exception:
+        pass
+
+    # 填充 metrics
+    for entry in results:
+        for i, oid in enumerate(entry["offers"]):
+            m = id_to_metrics.get(oid, {})
+            adv_id = id_to_adv.get(oid, "")
+            adv_name = adv_map.get(adv_id, adv_id)
+            entry["offers"][i] = {"id": oid, "adv": adv_name, "rev": m.get("rev", 0), "click": m.get("click", 0),
+                                  "ecpc": m.get("ecpc", 0), "cvr": m.get("cvr", 0)}
+
+    # 统计
+    stats = {"total": len(results), "green": sum(1 for r in results if r["status"] == "green"),
+             "yellow": sum(1 for r in results if r["status"] == "yellow"),
+             "red": sum(1 for r in results if r["status"] == "red")}
+    return results, stats
+
+
+def generate_excel(results, stats):
+    import openpyxl
+    from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "匹配结果"
+
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=10)
+    green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+    yellow_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+    red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                         top=Side(style='thin'), bottom=Side(style='thin'))
+
+    headers = ["包名", "GEO", "状态", "Offer ID", "7D Revenue", "7D Click", "eCPC", "CVR", "其他国家offer id"]
+    for c, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=c, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+        cell.border = thin_border
+
+    row = 2
+    for r in results:
+        fill = green_fill if r["status"] == "green" else yellow_fill if r["status"] == "yellow" else red_fill
+        status_text = "🟢" if r["status"] == "green" else "🟡" if r["status"] == "yellow" else "🔴"
+        if r["status"] == "green":
+            for o in r["offers"]:
+                vals = [r["pkg"], r["geo"], status_text, o["id"], o["rev"], o["click"], o["ecpc"], f'{o["cvr"]}%', ""]
+                for c, v in enumerate(vals, 1):
+                    cell = ws.cell(row=row, column=c, value=v)
+                    cell.fill = fill
+                    cell.border = thin_border
+                    cell.alignment = Alignment(horizontal='center')
+                row += 1
+        else:
+            other = ", ".join(r["other_offers"]) if r["other_offers"] else ""
+            vals = [r["pkg"], r["geo"], status_text, "无匹配" if r["status"] == "red" else "", "", "", "", "", other]
+            for c, v in enumerate(vals, 1):
+                cell = ws.cell(row=row, column=c, value=v)
+                cell.fill = fill
+                cell.border = thin_border
+                cell.alignment = Alignment(horizontal='center')
+            row += 1
+
+    ws.column_dimensions['A'].width = 48
+    ws.column_dimensions['B'].width = 10
+    ws.column_dimensions['C'].width = 8
+    ws.column_dimensions['D'].width = 30
+    ws.column_dimensions['E'].width = 15
+    ws.column_dimensions['F'].width = 12
+    ws.column_dimensions['G'].width = 10
+    ws.column_dimensions['H'].width = 8
+    ws.column_dimensions['I'].width = 65
+
+    # 统计 sheet
+    ws2 = wb.create_sheet("统计")
+    ws2.cell(row=1, column=1, value="总计").font = Font(bold=True)
+    ws2.cell(row=1, column=2, value=stats["total"])
+    ws2.cell(row=2, column=1, value="🟢 绿色").font = Font(color="006100")
+    ws2.cell(row=2, column=2, value=stats["green"])
+    ws2.cell(row=3, column=1, value="🟡 黄色").font = Font(color="9C6500")
+    ws2.cell(row=3, column=2, value=stats["yellow"])
+    ws2.cell(row=4, column=1, value="🔴 红色").font = Font(color="9C0006")
+    ws2.cell(row=4, column=2, value=stats["red"])
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+@app.post("/api/match-offers")
+@app.get("/api/match-offers")
+async def match_offers_endpoint(pub_id: str = Query(...), request: Request = None):
+    # Parse input
+    if request and request.method == "POST":
+        body = await request.json()
+        pairs = body.get("pairs", [])
+        fmt = body.get("format", "")
+    else:
+        # GET for Excel download
+        pairs_raw = request.query_params.get("pairs", "[]") if request else "[]"
+        try:
+            pairs = json.loads(pairs_raw)
+        except Exception:
+            pairs = []
+        fmt = request.query_params.get("format", "") if request else ""
+
+    if not pub_id:
+        return {"error": "pub_id required"}
+
+    # Get token
+    pub_config = load_pub_config()
+    pub_info = pub_config.get(pub_id, {})
+    token = pub_info.get("token", "") if isinstance(pub_info, dict) else ""
+
+    if not token:
+        return {"error": f"pub_id {pub_id} has no token configured"}
+
+    # Fetch Feed
+    offers = await fetch_feed_all(pub_id, token)
+    if isinstance(offers, dict) and "error" in offers:
+        return offers
+
+    # Match
+    conn = get_conn()
+    try:
+        results, stats = match_offers_impl(pairs, offers, conn)
+    finally:
+        conn.close()
+
+    # Export Excel
+    if fmt == "xlsx":
+        buf = generate_excel(results, stats)
+        filename = f"offer_match_{pub_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                 headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+    return {"pub_id": pub_id, "stats": stats, "matches": results}
 
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True))
