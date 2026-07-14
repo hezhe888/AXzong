@@ -1320,7 +1320,7 @@ const OfferMatchView = () => {
     return Object.entries(pubNameMap).map(([k, v]) => ({ label: typeof v === 'string' ? `${k}-${v}` : `${k}-${v.name}`, value: k }));
   }, []);
   const getToken = (pid) => { const info = pubNameMap[pid]; return info && typeof info === 'object' ? (info.token || '') : ''; };
-  const parsePairs = () => pairs.split(/[\r\n]+/).map(l => { const p = l.split(/\t+/); return { pkg: (p[0] || '').trim(), geo: (p[1] || '').trim() }; }).filter(x => x.pkg && x.geo);
+  const parsePairs = () => pairs.split(/[\r\n]+/).map(l => { const p = l.split(/\s+/); return { pkg: (p[0] || '').trim(), geo: (p[1] || '').trim() }; }).filter(x => x.pkg && x.geo);
 
   const doMatch = async () => {
     setLoading(true);
