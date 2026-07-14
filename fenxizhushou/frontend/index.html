@@ -1274,7 +1274,7 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
       globalStats[oid].totalClick += (Number(d.Click) || 0);
       globalStats[oid].totalConv += (Number(d.Conversion) || 0);
       globalStats[oid].totalCbConv += (Number(d['Callback Conversion']) || 0);
-      globalStats[oid].byPub[pubId] = true;
+      globalStats[oid].byPub[pubId] = globalStats[oid].byPub[pubId] || (Number(d.Revenue) || 0) > 0 || (Number(d.Click) || 0) > 200;
       if (!localStats[pubId]) localStats[pubId] = {};
       if (!localStats[pubId][oid]) localStats[pubId][oid] = { id: oid, rev: 0, payout: 0, click: 0, conv: 0, cbconv: 0, pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
       localStats[pubId][oid].rev += (Number(d.Revenue) || 0);
