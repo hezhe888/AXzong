@@ -363,10 +363,15 @@ def generate_excel(results, stats, sep=",", checked_ids=None):
         fill = green_fill if r["status"] == "green" else yellow_fill if r["status"] == "yellow" else red_fill
         status_text = "🟢" if r["status"] == "green" else "🟡" if r["status"] == "yellow" else "🔴"
         if r["status"] == "green":
-            # 如果传了 checked_ids，只取已勾选的
-            ids = [o["id"] for o in r["offers"] if not checked_ids or o["id"] in checked]
+            ids = [o["id"] for o in r["offers"] if not checked or o["id"] in checked]
+            # Skip row entirely if checked mode and no selected IDs in this row
+            if checked and not ids:
+                continue
             oid_str = sep.join(ids) if ids else ""
         else:
+            # Skip yellow/red rows in checked mode (no offers to select)
+            if checked:
+                continue
             oid_str = "无匹配" if r["status"] == "red" else ""
         other = ", ".join(r["other_offers"]) if r["other_offers"] else ""
         vals = [r["pkg"], r["geo"], status_text, oid_str, other]
