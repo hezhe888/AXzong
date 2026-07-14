@@ -225,9 +225,9 @@ def match_offers_impl(pairs, feed_data, conn):
 
     # 收集所有 match 到的 offer_id
     all_matched_ids = []
-    for pkg, geo in pairs:
-        pkg = (pkg or "").strip()
-        geo = (geo or "").strip().upper()
+    for pair in pairs:
+        pkg = (pair.get("pkg","") or "").strip()
+        geo = (pair.get("geo","") or "").strip().upper()
         entry = {"pkg": pkg, "geo": geo, "status": "red", "offers": [], "other_offers": []}
         if pkg in idx:
             if geo in idx[pkg]:
