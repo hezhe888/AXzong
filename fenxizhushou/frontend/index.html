@@ -1319,13 +1319,14 @@ const OfferMatchView = () => {
   const [dateFrom, setDateFrom] = useState(dayOffset(7));
   const [dateTo, setDateTo] = useState(dayOffset(1));
   const [snapshot, setSnapshot] = useState(null);
+  const [availableDates, setAvailableDates] = useState([]);
   const pubOptions = useMemo(() => {
     return Object.entries(pubNameMap).map(([k, v]) => ({ label: typeof v === 'string' ? `${k}-${v}` : `${k}-${v.name}`, value: k }));
   }, []);
   const getToken = (pid) => { const info = pubNameMap[pid]; return info && typeof info === 'object' ? (info.token || '') : ''; };
   const parsePairs = () => pairs.split(/[\r\n]+/).map(l => { const p = l.split(/\s+/); return { pkg: (p[0] || '').trim(), geo: (p[1] || '').trim() }; }).filter(x => x.pkg && x.geo);
 
-  useEffect(() => { fetch('/api/feed-snapshot?pub_id='+pubId).then(r=>r.json()).then(setSnapshot); }, [pubId]);
+  useEffect(() => { fetch('/api/feed-snapshot?pub_id='+pubId).then(r=>r.json()).then(setSnapshot); fetchDates().then(setAvailableDates); }, [pubId]);
 
   const doMatch = async () => {
     setLoading(true);
@@ -1376,9 +1377,14 @@ const OfferMatchView = () => {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black text-slate-400 uppercase">日期</span>
-            <input type="text" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-slate-50 border rounded-lg px-2 py-1.5 text-xs font-bold w-24 outline-none"/>
+            <select value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-slate-50 border rounded-lg px-2 py-1.5 text-xs font-bold outline-none">
+              {availableDates.map(d => <option key={d} value={d}>{d.slice(4,6)}月{d.slice(6,8)}日</option>)}
+            </select>
             <span className="text-slate-400">→</span>
-            <input type="text" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-slate-50 border rounded-lg px-2 py-1.5 text-xs font-bold w-24 outline-none"/>
+            <select value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-slate-50 border rounded-lg px-2 py-1.5 text-xs font-bold outline-none">
+              {availableDates.map(d => <option key={d} value={d}>{d.slice(4,6)}月{d.slice(6,8)}日</option>)}
+            </select>
+            <button onClick={()=>{setDateFrom(dayOffset(3));setDateTo(dayOffset(1));}} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">近3天</button>
             <button onClick={()=>{setDateFrom(dayOffset(7));setDateTo(dayOffset(1));}} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">近7天</button>
             <button onClick={()=>{setDateFrom(dayOffset(14));setDateTo(dayOffset(1));}} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">近14天</button>
           </div>
