@@ -1243,6 +1243,7 @@ const AdvTopView = ({ data, onCopy }) => {
 
 const IdJoinerView = () => {
   const [input, setInput] = useState('');
+  const [sep, setSep] = useState('|');
   const result = useMemo(() => {
     const tokens = input.split(/[,;\s\r\n]+/).filter(Boolean);
     const ids = []; const seen = new Set();
@@ -1252,15 +1253,21 @@ const IdJoinerView = () => {
     });
     return ids;
   }, [input]);
-  const handleCopy = () => { copyToClipboard(result.join('|')); };
+  const handleCopy = () => { copyToClipboard(result.join(sep)); };
   return (
     <div className="space-y-6 w-full" style={{minHeight: 'calc(100vh - 200px)'}}>
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-4">
-        <h3 className="font-black text-slate-800 text-lg flex items-center gap-2"><I name="Copy" size={20} color="#3b82f6"/> 拼接id</h3>
+        <div className="flex items-center gap-3"><h3 className="font-black text-slate-800 text-lg flex items-center gap-2"><I name="Copy" size={20} color="#3b82f6"/> 拼接id</h3>
+          <div className="flex bg-slate-100 p-0.5 rounded-lg">
+            {['|',','].map(s => (
+              <button key={s} onClick={() => setSep(s)} className={`px-3 py-0.5 rounded-md text-[11px] font-bold transition-colors ${sep === s ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{s === '|' ? 'pipe' : '逗号'}</button>
+            ))}
+          </div>
+        </div>
         <textarea value={input} onChange={e => setInput(e.target.value)} placeholder="粘贴文本，支持 , ; 空格 tab 换行 分隔。自动提取首段数字为 Offer ID"
           className="w-full h-40 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500/20 resize-y"/>
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 font-mono text-sm text-slate-700 break-all">{result.join('|') || <span className="text-slate-400">等待输入...</span>}</div>
+          <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 font-mono text-sm text-slate-700 break-all">{result.join(sep) || <span className="text-slate-400">等待输入...</span>}</div>
           <button onClick={handleCopy} disabled={result.length === 0}
             className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ${result.length > 0 ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm' : 'bg-slate-100 text-slate-400'}`}><I name="Copy" size={14}/> 复制 ({result.length})</button>
         </div>
