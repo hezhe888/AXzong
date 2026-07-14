@@ -127,29 +127,48 @@ def fetch_reject_records(dates):
     conn = pymysql.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
-    placeholders = ','.join(['%s'] * len(dates))
+    beijing = timezone(timedelta(hours=8))
+    now_beijing = datetime.now(beijing)
+    today_str = now_beijing.strftime('%Y%m%d')
+    hour_beijing = now_beijing.hour
 
-    sql = f'''
-    SELECT
-        date,
-        adgroup_id,
-        pkg_name,
-        COALESCE(adv_country, '-'),
-        mid,
-        reject,
-        conversion
-    FROM offerplus_detail_report
-    WHERE src = %s AND date IN ({placeholders}) AND reject > 0
-    '''
+    all_rows = []
 
-    cursor.execute(sql, [ADV_ID] + dates)
-    rows = cursor.fetchall()
+    past_dates = [d for d in dates if d != today_str]
+    if past_dates:
+        placeholders = ','.join(['%s'] * len(past_dates))
+        sql = f'''
+        SELECT date, adgroup_id, pkg_name, COALESCE(adv_country, '-'), mid, reject, conversion
+        FROM offerplus_detail_report
+        WHERE src = %s AND date IN ({placeholders}) AND reject > 0
+        '''
+        cursor.execute(sql, [ADV_ID] + past_dates)
+        all_rows.extend(cursor.fetchall())
+
+    if today_str in dates:
+        snapshot_table = 'offerplus_detail_report_snapshot_6' if hour_beijing >= 16 else 'offerplus_detail_report_snapshot_8'
+        sql = f'''
+        SELECT date, adgroup_id, pkg_name, COALESCE(adv_country, '-'), mid, reject, conversion
+        FROM {snapshot_table}
+        WHERE src = %s AND date = %s AND reject > 0
+        '''
+        cursor.execute(sql, [ADV_ID, today_str])
+        snapshot_rows = cursor.fetchall()
+        if not snapshot_rows and hour_beijing >= 16:
+            sql = f'''
+            SELECT date, adgroup_id, pkg_name, COALESCE(adv_country, '-'), mid, reject, conversion
+            FROM offerplus_detail_report_snapshot_8
+            WHERE src = %s AND date = %s AND reject > 0
+            '''
+            cursor.execute(sql, [ADV_ID, today_str])
+            snapshot_rows = cursor.fetchall()
+        all_rows.extend(snapshot_rows)
 
     pub_mapping = load_pub_mapping()
     unknown_mids = set()
 
     records = []
-    for row in rows:
+    for row in all_rows:
         date_str = row[0]
         oid = row[1]
         pkg = row[2]
