@@ -182,7 +182,7 @@ async def fetch_feed_all(pub_id: str, token: str):
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.get(url, params={"pub_id": pub_id, "token": token, "page": 1, "per_page": 1000})
         data = r.json()
-        if data.get("code") != 0:
+        if int(data.get("code", 0)) not in (0, 200):
             return {"error": f"Feed API error: {data.get('message', 'unknown')}"}
         total = int(data["data"]["total"])
         all_offers.extend(data["data"]["offer"])
@@ -190,7 +190,7 @@ async def fetch_feed_all(pub_id: str, token: str):
         for p in range(2, total_pages + 1):
             r = await client.get(url, params={"pub_id": pub_id, "token": token, "page": p, "per_page": 1000})
             d = r.json()
-            if d.get("code") == 0:
+            if int(d.get("code", 0)) in (0, 200):
                 all_offers.extend(d["data"]["offer"])
 
     FEED_CACHE[cache_key] = all_offers
