@@ -1241,6 +1241,34 @@ const AdvTopView = ({ data, onCopy }) => {
   );
 };
 
+const IdJoinerView = () => {
+  const [input, setInput] = useState('');
+  const result = useMemo(() => {
+    const tokens = input.split(/[,;\s\r\n]+/).filter(Boolean);
+    const ids = []; const seen = new Set();
+    tokens.forEach(t => {
+      const tid = extractOfferId(t.trim());
+      if (tid && /^\d+$/.test(tid) && !seen.has(tid)) { seen.add(tid); ids.push(tid); }
+    });
+    return ids;
+  }, [input]);
+  const handleCopy = () => { copyToClipboard(result.join('|')); };
+  return (
+    <div className="space-y-6 w-full" style={{minHeight: 'calc(100vh - 200px)'}}>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-4">
+        <h3 className="font-black text-slate-800 text-lg flex items-center gap-2"><I name="Copy" size={20} color="#3b82f6"/> 拼接id</h3>
+        <textarea value={input} onChange={e => setInput(e.target.value)} placeholder="粘贴文本，支持 , ; 空格 tab 换行 分隔。自动提取首段数字为 Offer ID"
+          className="w-full h-40 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500/20 resize-y"/>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 font-mono text-sm text-slate-700 break-all">{result.join('|') || <span className="text-slate-400">等待输入...</span>}</div>
+          <button onClick={handleCopy} disabled={result.length === 0}
+            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 ${result.length > 0 ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm' : 'bg-slate-100 text-slate-400'}`}><I name="Copy" size={14}/> 复制 ({result.length})</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const RankingView = ({ data, onCopy }) => {
   const topOffers = useMemo(() => {
     const grouped = data.reduce((acc, d) => { const k = d.Offer || 'Unknown'; acc[k] = (acc[k] || 0) + (Number(d.Revenue) || 0); return acc; }, {});
@@ -1418,7 +1446,7 @@ function App() {
     loadData(from, to);
   };
 
-  const tabLabel = { dashboard: "总览看板", trend: "趋势分析", packageScout: "包名透视", anomaly: "异常监控", capWarning: "Cap预警", exclusion: "每日剔除", expansion: "拓量蓝海", advtop: "adv-top", ranking: "绩效排行" };
+  const tabLabel = { dashboard: "总览看板", trend: "趋势分析", packageScout: "包名透视", anomaly: "异常监控", capWarning: "Cap预警", exclusion: "每日剔除", expansion: "拓量蓝海", advtop: "adv-top", joiner: "拼接id", ranking: "绩效排行" };
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] text-slate-700 overflow-hidden font-sans">
@@ -1434,6 +1462,7 @@ function App() {
           <NavItem iconName="FilterX" label="每日剔除" active={activeTab==='exclusion'} onClick={()=>setActiveTab('exclusion')}/>
           <NavItem iconName="Compass" label="拓量蓝海" active={activeTab==='expansion'} onClick={()=>setActiveTab('expansion')}/>
           <NavItem iconName="Zap" label="adv-top" active={activeTab==='advtop'} onClick={()=>setActiveTab('advtop')}/>
+          <NavItem iconName="Copy" label="拼接id" active={activeTab==='joiner'} onClick={()=>setActiveTab('joiner')}/>
           <NavItem iconName="Award" label="绩效排行" active={activeTab==='ranking'} onClick={()=>setActiveTab('ranking')}/>
         </nav>
         {lastRefresh && <div className="px-4 py-3 border-t text-[10px] text-slate-400 font-bold space-y-1"><div className="flex items-center gap-1.5"><I name="CheckCircle2" size={12} color="#10b981"/> 刷新: {lastRefresh.toLocaleTimeString()}</div>{latestData.latest_date && <div className="flex items-center gap-1.5"><I name="Calendar" size={12} color="#3b82f6"/> 数据至: {latestData.latest_date.slice(4,6)}月{latestData.latest_date.slice(6,8)}日 {latestData.latest_created ? latestData.latest_created.slice(11,19) : ''}</div>}</div>}
@@ -1470,6 +1499,7 @@ function App() {
               {activeTab === 'exclusion' && <ExclusionView data={rawData} filters={filters} setFilters={setFilters} onCopy={t => {copyToClipboard(t); showToast("已复制名单");}} />}
               {activeTab === 'expansion' && <ExpansionView data={rawData} filters={filters} setFilters={setFilters} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
               {activeTab === 'advtop' && <AdvTopView data={rawData} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
+              {activeTab === 'joiner' && <IdJoinerView />}
               {activeTab === 'ranking' && <RankingView data={rawData} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
             </>
           )}
