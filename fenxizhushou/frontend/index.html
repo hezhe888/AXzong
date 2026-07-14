@@ -130,6 +130,11 @@ const getPubLabel = (mid) => {
   return name ? `${m}-${name}` : m;
 };
 
+const getAdvLabel = (src) => {
+  const name = advNameMap[String(src)];
+  return name ? `${src}-${name}` : String(src);
+};
+
 let advNameMap = {};
 const fetchAdvNames = async () => {
   try {
@@ -554,28 +559,49 @@ const DashboardView = ({ data }) => {
 
 const TrendExplorerView = ({ data }) => {
   const dims = ['Pub ID', 'Advertiser ID', 'Package Name', 'Offer'];
+  const dimLabels = { 'Pub ID': '渠道', 'Advertiser ID': '广告主', 'Package Name': '包名', 'Offer': 'Offer' };
   const [dimKey, setDimKey] = useState('Pub ID');
   const [selectedItems, setSelectedItems] = useState([]);
   const [activeMetrics, setActiveMetrics] = useState(['Payout', 'Revenue']);
+  const [crossFilters, setCrossFilters] = useState({});
   const metricsAll = ['Payout', 'Revenue', 'Click', 'CVR', 'eCPC'];
 
+  const getFmt = (dk) => dk === 'Offer' ? extractOfferId : (dk === 'Pub ID' ? getPubLabel : (dk === 'Advertiser ID' ? getAdvLabel : (s => s)));
+
   const dimOptions = useMemo(() => {
-    const fmt = dimKey === 'Offer' ? extractOfferId : (dimKey === 'Pub ID' ? getPubLabel : (s => s));
+    const fmt = getFmt(dimKey);
     const unique = new Set(data.map(d => d[dimKey]).filter(Boolean));
     return Array.from(unique).sort().map(v => ({ label: fmt(v), value: v }));
   }, [data, dimKey]);
 
+  const crossDims = dims.filter(d => d !== dimKey);
+
+  const crossOptions = useMemo(() => {
+    const opts = {};
+    crossDims.forEach(dk => {
+      const fmt = getFmt(dk);
+      const unique = new Set(data.map(d => d[dk]).filter(Boolean));
+      opts[dk] = [{ label: '全部', value: '' }, ...Array.from(unique).sort().map(v => ({ label: fmt(v), value: v }))];
+    });
+    return opts;
+  }, [data, crossDims]);
+
   const topItems = useMemo(() => {
-    const totals = {}; data.forEach(d => { const v = d[dimKey]; if (!v) return; totals[v] = (totals[v] || 0) + (Number(d.Revenue) || 0); });
+    let filtered = data;
+    Object.entries(crossFilters).forEach(([dk, val]) => { if (val) filtered = filtered.filter(d => String(d[dk]) === val); });
+    const totals = {}; filtered.forEach(d => { const v = d[dimKey]; if (!v) return; totals[v] = (totals[v] || 0) + (Number(d.Revenue) || 0); });
     return Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
-  }, [data, dimKey]);
+  }, [data, dimKey, crossFilters]);
 
   const items = selectedItems.length > 0 ? selectedItems.slice(0, 5) : topItems;
 
   const chartData = useMemo(() => {
-    const fmt = dimKey === 'Pub ID' ? getPubLabel : (dimKey === 'Offer' ? extractOfferId : (s => s));
+    const fmt = getFmt(dimKey);
     const byDate = {};
     data.forEach(d => {
+      let skip = false;
+      Object.entries(crossFilters).forEach(([dk, val]) => { if (val && String(d[dk]) !== val) skip = true; });
+      if (skip) return;
       const raw = d[dimKey]; if (!raw || !items.includes(raw)) return;
       const date = d.Date; if (!byDate[date]) byDate[date] = {};
       if (!byDate[date][raw]) byDate[date][raw] = { payout: 0, rev: 0, click: 0, cbconv: 0 };
@@ -601,12 +627,8 @@ const TrendExplorerView = ({ data }) => {
     });
     const activeKeys = [];
     const colors = generateColors(items.length * activeMetrics.length);
-    let ci = 0;
     items.forEach(item => {
-      activeMetrics.forEach(m => {
-        activeKeys.push(item + ' ' + m);
-        ci++;
-      });
+      activeMetrics.forEach(m => { activeKeys.push(item + ' ' + m); });
     });
     const mc = activeKeys.map((k, i) => {
       const parts = k.split(' ');
@@ -614,7 +636,7 @@ const TrendExplorerView = ({ data }) => {
       return { key: k, label: itemName + ' ' + parts[parts.length - 1], color: colors[i % colors.length] };
     });
     return { data: chartRows, activeMetrics: activeKeys, metricsConfig: mc };
-  }, [data, dimKey, items, activeMetrics]);
+  }, [data, dimKey, items, activeMetrics, crossFilters]);
 
   const toggleMetric = (m) => {
     setActiveMetrics(prev => prev.includes(m) ? (prev.length > 1 ? prev.filter(k => k !== m) : prev) : [...prev, m]);
@@ -625,14 +647,27 @@ const TrendExplorerView = ({ data }) => {
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-4">
         <div className="flex gap-2 bg-slate-100 p-1 rounded-xl self-start">
           {dims.map(d => (
-            <button key={d} onClick={() => { setDimKey(d); setSelectedItems([]); }}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${dimKey === d ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{d === 'Pub ID' ? '渠道' : d === 'Advertiser ID' ? '广告主' : d === 'Package Name' ? '包名' : 'Offer'}</button>
+            <button key={d} onClick={() => { setDimKey(d); setSelectedItems([]); setCrossFilters({}); }}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${dimKey === d ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{dimLabels[d]}</button>
           ))}
         </div>
         <div className="flex items-center gap-4 flex-wrap">
           <span className="text-[10px] font-black text-slate-400 uppercase">选择对象（≤5）</span>
-          <div className="flex-1 max-w-xl"><MultiSelect options={dimOptions} value={selectedItems} onChange={setSelectedItems} placeholder={selectedItems.length === 0 ? '留空=Top5营收···' : ''}/></div>
+          <div className="flex-1 max-w-xl"><MultiSelect options={dimOptions} value={selectedItems} onChange={setSelectedItems} placeholder={selectedItems.length === 0 ? '留空=Top5营收' : ''}/></div>
         </div>
+        {crossDims.length > 0 && (
+          <div className="flex items-center gap-3 flex-wrap border-t border-slate-100 pt-3">
+            <span className="text-[10px] font-black text-slate-400 uppercase">交叉筛选</span>
+            {crossDims.map(dk => (
+              <div key={dk} className="flex items-center gap-1.5">
+                <span className="text-[10px] text-slate-400">{dimLabels[dk]}:</span>
+                <select value={crossFilters[dk] || ''} onChange={e => setCrossFilters(prev => ({ ...prev, [dk]: e.target.value }))} className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none focus:ring-2 focus:ring-orange-500/20">
+                  {(crossOptions[dk] || []).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex gap-2 bg-slate-50 p-1.5 rounded-xl self-start flex-wrap">
           {metricsAll.map(m => {
             const isActive = activeMetrics.includes(m);
@@ -643,7 +678,7 @@ const TrendExplorerView = ({ data }) => {
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col min-h-[450px]">
         <div className="flex items-center gap-2 mb-3 shrink-0">
           <I name="LineChart" size={16} color="#3b82f6"/>
-          <h3 className="font-black text-slate-700 text-xs uppercase tracking-widest">{dims.find(d=>d===dimKey)? { 'Pub ID': '渠道', 'Advertiser ID': '广告主', 'Package Name': '包名', 'Offer': 'Offer' }[dimKey] : dimKey} 趋势 · {items.length} 对象 · {activeMetrics.length} 指标</h3>
+          <h3 className="font-black text-slate-700 text-xs uppercase tracking-widest">{dimLabels[dimKey]} 趋势 · {items.length} 对象 · {activeMetrics.length} 指标</h3>
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1 mb-2 h-12 overflow-y-auto shrink-0">
           {chartData.metricsConfig.map((cfg, i) => (<div key={i} className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: cfg.color }}></div><span className="text-[10px] font-bold text-slate-500 truncate max-w-[220px]" title={cfg.label}>{cfg.label}</span></div>))}
@@ -1103,11 +1138,6 @@ const ExclusionView = ({ data, filters, setFilters, onCopy }) => {
 
 const AdvTopView = ({ data, onCopy }) => {
   const [filters, setF] = useState({ minRevenue: 5, minEcpc: 2, minCvr: 1, minClick: 100 });
-
-  const getAdvLabel = (src) => {
-    const name = advNameMap[String(src)];
-    return name ? `${src}-${name}` : String(src);
-  };
 
   const advertiserGroups = useMemo(() => {
     const advMap = {};
