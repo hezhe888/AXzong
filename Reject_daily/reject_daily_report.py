@@ -130,7 +130,6 @@ def fetch_reject_records(dates):
     beijing = timezone(timedelta(hours=8))
     now_beijing = datetime.now(beijing)
     today_str = now_beijing.strftime('%Y%m%d')
-    hour_beijing = now_beijing.hour
 
     all_rows = []
 
@@ -146,23 +145,13 @@ def fetch_reject_records(dates):
         all_rows.extend(cursor.fetchall())
 
     if today_str in dates:
-        snapshot_table = 'offerplus_detail_report_snapshot_6' if hour_beijing >= 16 else 'offerplus_detail_report_snapshot_8'
         sql = f'''
         SELECT date, adgroup_id, pkg_name, COALESCE(adv_country, '-'), mid, reject, conversion
-        FROM {snapshot_table}
+        FROM offerplus_detail_report_snapshot_8
         WHERE src = %s AND date = %s AND reject > 0
         '''
         cursor.execute(sql, [ADV_ID, today_str])
-        snapshot_rows = cursor.fetchall()
-        if not snapshot_rows and hour_beijing >= 16:
-            sql = f'''
-            SELECT date, adgroup_id, pkg_name, COALESCE(adv_country, '-'), mid, reject, conversion
-            FROM offerplus_detail_report_snapshot_8
-            WHERE src = %s AND date = %s AND reject > 0
-            '''
-            cursor.execute(sql, [ADV_ID, today_str])
-            snapshot_rows = cursor.fetchall()
-        all_rows.extend(snapshot_rows)
+        all_rows.extend(cursor.fetchall())
 
     pub_mapping = load_pub_mapping()
     unknown_mids = set()
