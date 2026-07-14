@@ -1263,6 +1263,7 @@ const RankingView = ({ data, onCopy }) => {
 };
 
 const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
+  const [sortMode, setSortMode] = useState('revenue');
   const recommendations = useMemo(() => {
     const pubs = Array.from(new Set(data.map(d => String(d['Pub ID'] || '')))).filter(p => p !== 'undefined' && p !== '').sort();
     const globalStats = {}, localStats = {};
@@ -1322,11 +1323,18 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-slate-50/50 rounded-xl p-5 border border-slate-100">
               <div className="flex justify-between items-center mb-4">
-                <h4 className="font-black text-slate-700 text-sm flex items-center gap-2"><I name="Compass" size={16} color="#3b82f6"/> 可向 {getPubLabel(res.pub)} 推荐 (NEW)</h4>
+                <div className="flex items-center gap-3">
+                  <h4 className="font-black text-slate-700 text-sm flex items-center gap-2"><I name="Compass" size={16} color="#3b82f6"/> 可向 {getPubLabel(res.pub)} 推荐</h4>
+                  <div className="flex bg-slate-100 p-0.5 rounded-lg">
+                    {['revenue','ecpc','cvr'].map(k => (
+                      <button key={k} onClick={() => setSortMode(k)} className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-colors ${sortMode === k ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{k === 'revenue' ? 'Rev' : k.toUpperCase()}</button>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex gap-2"><button onClick={() => copyIds(res.blueOcean)} className="bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-slate-50">复制 ID</button><button onClick={() => copyFormatted(res.blueOcean)} className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200">复制格式</button></div>
               </div>
               <div className="flex flex-wrap gap-2">
-                {res.blueOcean.slice(0, 12).map((o, i) => (<div key={i} className="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-2"><span>{o.id}</span><span className="text-slate-300">|</span><span className="text-emerald-600">${o.totalRev.toFixed(0)}</span></div>))}
+                {[...res.blueOcean].sort((a,b) => sortMode === 'ecpc' ? b.ecpc - a.ecpc : sortMode === 'cvr' ? b.cvr - a.cvr : b.totalRev - a.totalRev).slice(0, 12).map((o, i) => (<div key={i} className="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-2"><span>{o.id}</span><span className="text-slate-300">|</span><span className={sortMode === 'ecpc' ? 'text-rose-600' : sortMode === 'cvr' ? 'text-emerald-600' : 'text-emerald-600'}>${sortMode === 'ecpc' ? o.ecpc.toFixed(2) : sortMode === 'cvr' ? o.cvr.toFixed(2) + '%' : o.totalRev.toFixed(0)}</span></div>))}
                 {res.blueOcean.length > 12 && <div className="px-3 py-1.5 text-xs font-bold text-slate-400 flex items-center">+{res.blueOcean.length - 12} more...</div>}
                 {res.blueOcean.length === 0 && <div className="text-slate-400 text-xs italic">暂无推荐</div>}
               </div>
@@ -1368,7 +1376,7 @@ function App() {
   const [lastRefresh, setLastRefresh] = useState(null);
   const [latestData, setLatestData] = useState({ latest_date: '', latest_created: '' });
   const [unknownIds, setUnknownIds] = useState({ pubs: [], advs: [] });
-  const [filters, setFilters] = useState({ minRevenue: 5, minConv: 20, minClicks: 1000, maxCvr: 0.1, maxEcpc: 0.1,                                       maxRevenue: 1, minPayout: 0.5, minEcpc: 0.5, minCvr: 0.5, minClickEcpc: 20, minEcpcBlue: 1, minCvrBlue: 0.5 });
+  const [filters, setFilters] = useState({ minRevenue: 5, minConv: 20, minClicks: 1000, maxCvr: 0.1, maxEcpc: 0.1,                                       maxRevenue: 1, minPayout: 0.5, minEcpc: 1, minCvr: 1, minClickEcpc: 20, minEcpcBlue: 1, minCvrBlue: 0.5 });
 
   const loadData = useCallback(async (from, to) => {
     setLoading(true);
