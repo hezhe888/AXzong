@@ -1368,7 +1368,7 @@ function App() {
   const [lastRefresh, setLastRefresh] = useState(null);
   const [latestData, setLatestData] = useState({ latest_date: '', latest_created: '' });
   const [unknownIds, setUnknownIds] = useState({ pubs: [], advs: [] });
-  const [filters, setFilters] = useState({ minRevenue: 5, minConv: 20, minClicks: 1000, maxCvr: 0.1, maxEcpc: 0.1,                                       maxRevenue: 1, minPayout: 1, minEcpc: 1, minCvr: 1, minClickEcpc: 100, minEcpcBlue: 1, minCvrBlue: 0.5 });
+  const [filters, setFilters] = useState({ minRevenue: 5, minConv: 20, minClicks: 1000, maxCvr: 0.1, maxEcpc: 0.1,                                       maxRevenue: 1, minPayout: 1, minEcpc: 1, minCvr: 1, minClickEcpc: 20, minEcpcBlue: 1, minCvrBlue: 0.5 });
 
   const loadData = useCallback(async (from, to) => {
     setLoading(true);
