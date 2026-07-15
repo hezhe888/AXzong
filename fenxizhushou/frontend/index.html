@@ -1375,7 +1375,11 @@ const OfferMatchView = () => {
     setSnapshot(null);
     const r = await fetch('/api/feed-snapshot?pub_id='+pubId, {method:'POST'});
     const data = await r.json();
-    if (data.error && data.error.includes('no token')) { setTokenInput(''); setTokenModal(true); return; }
+    if (data.error) {
+      if (data.error.includes('no token')) { setTokenInput(''); setTokenModal(true); return; }
+      setSnapshot(data);
+      return;
+    }
     setSnapshot(data);
   };
 
@@ -1424,9 +1428,14 @@ const OfferMatchView = () => {
         <div className="flex items-center gap-3 text-[10px] text-slate-500">
           <span className="font-bold">快照: </span>
           {snapshot ? (
-            <span className="text-slate-600">{snapshot.timestamp} · {snapshot.count?.toLocaleString()} offers</span>
+            snapshot.error ? (
+              <span className="text-rose-600">错误: {snapshot.error}</span>
+            ) : (
+              <span className="text-slate-600">{snapshot.timestamp} · {snapshot.count?.toLocaleString()} offers</span>
+            )
           ) : <span className="text-slate-400">检查中...</span>}
           <button onClick={updateSnapshot} className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-[10px] font-bold hover:bg-amber-100">更新Feed</button>
+          {snapshot?.error && <button onClick={() => { setTokenInput(''); setTokenModal(true); }} className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded text-[10px] font-bold hover:bg-rose-100">重输Token</button>}
         </div>
         <textarea value={pairs} onChange={e => setPairs(e.target.value)} placeholder="每行 包名\tGEO&#10;例：com.globe.gcash.android	PH"
           className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-mono outline-none focus:ring-2 focus:ring-purple-500/20 resize-y"/>
