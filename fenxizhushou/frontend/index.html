@@ -1318,6 +1318,7 @@ const OfferMatchView = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [selectedYellow, setSelectedYellow] = useState(new Set());
   const [sepMode, setSepMode] = useState('|');
   const [dateFrom, setDateFrom] = useState(dayOffset(7));
   const [dateTo, setDateTo] = useState(dayOffset(1));
@@ -1359,11 +1360,13 @@ const OfferMatchView = () => {
   const handleCheck = (oid, checked) => { setSelectedIds(prev => { const next = new Set(prev); checked ? next.add(oid) : next.delete(oid); return next; }); };
   const toggleAll = () => {
     if (!result) return;
-    const allIds = new Set(); (result.matches || []).forEach(m => { if (m.status === 'green') m.offers.forEach(o => allIds.add(o.id)); m.other_offers.forEach(o => allIds.add(o.split('-')[0])); });
-    if (selectedIds.size === allIds.size && allIds.size > 0) setSelectedIds(new Set()); else setSelectedIds(allIds);
+    const allIds = new Set(); const allYellows = new Set();
+    result.matches.forEach((m, mi) => { if (m.status === 'green') m.offers.forEach(o => allIds.add(o.id)); if (m.other_offers.length > 0) allYellows.add(mi); });
+    if (selectedIds.size === allIds.size && allIds.size > 0 && selectedYellow.size === allYellows.size) { setSelectedIds(new Set()); setSelectedYellow(new Set()); }
+    else { setSelectedIds(allIds); setSelectedYellow(allYellows); }
   };
-  const copyIds = () => { const ids = []; (result?.matches || []).forEach(m => { m.offers.forEach(o => { if (selectedIds.has(o.id)) ids.push(o.id); }); m.other_offers.forEach(o => { const oid = o.split('-')[0]; if (selectedIds.has(oid)) ids.push(oid); }); }); copyToClipboard(ids.join(sepMode === '|' ? '|' : ',')); };
-  const copyFmt = () => { const lines = []; (result?.matches || []).forEach(m => { m.offers.forEach(o => { if (selectedIds.has(o.id)) lines.push(`${o.id}|${m.pkg}|${m.geo}`); }); m.other_offers.forEach(o => { const oid = o.split('-')[0]; if (selectedIds.has(oid)) lines.push(`${oid}|${m.pkg}|${m.geo}`); }); }); copyToClipboard(lines.join('\n')); };
+  const copyIds = () => { const ids = []; (result?.matches || []).forEach((m, mi) => { m.offers.forEach(o => { if (selectedIds.has(o.id)) ids.push(o.id); }); if (selectedYellow.has(mi)) m.other_offers.forEach(o => ids.push(o.split('-')[0])); }); copyToClipboard(ids.join(sepMode === '|' ? '|' : ',')); };
+  const copyFmt = () => { const lines = []; (result?.matches || []).forEach((m, mi) => { m.offers.forEach(o => { if (selectedIds.has(o.id)) lines.push(`${o.id}|${m.pkg}|${m.geo}`); }); if (selectedYellow.has(mi)) m.other_offers.forEach(o => lines.push(`${o.split('-')[0]}|${m.pkg}|${m.geo}`)); }); copyToClipboard(lines.join('\n')); };
 
   const updateSnapshot = async () => {
     setSnapshot(null);
@@ -1466,7 +1469,7 @@ const OfferMatchView = () => {
                       <tr key={mi} style={{backgroundColor: fill, borderBottom: '2px solid #94a3b8'}}>
                         <td className="px-3 py-2 font-bold text-xs">{m.pkg}</td><td className="px-3 py-2 font-bold text-xs text-center">{m.geo}</td>
                         <td className="px-3 py-2 text-center">{m.status === 'green' ? '🟢' : m.status === 'yellow' ? '🟡' : '🔴'}</td>
-                        <td className="px-3 py-2 text-center">{m.other_offers.length > 0 ? <input type="checkbox" checked={m.other_offers.every(o => selectedIds.has(o.split('-')[0]))} onChange={e => m.other_offers.forEach(o => handleCheck(o.split('-')[0], e.target.checked))}/> : null}</td>
+                        <td className="px-3 py-2 text-center">{m.other_offers.length > 0 ? <input type="checkbox" checked={selectedYellow.has(mi)} onChange={e => { setSelectedYellow(prev => { const next = new Set(prev); e.target.checked ? next.add(mi) : next.delete(mi); return next; }); }}/> : null}</td>
                         <td className="px-3 py-2 font-bold text-xs">{m.status === 'red' ? '无匹配' : '—'}</td>
                         <td className="px-3 py-2 text-xs text-slate-400" colSpan={4}>{m.other_offers.length > 0 ? '其他国家: ' + m.other_offers.join(', ') : ''}</td>
                       </tr>
