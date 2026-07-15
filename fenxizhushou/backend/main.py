@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import pymysql
 import httpx
+import pycountry
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -259,6 +260,18 @@ def build_index(offers):
     return idx
 
 
+def normalize_geo(geo):
+    """ISO alpha-3 → alpha-2 转换，如 IND→IN"""
+    g = (geo or "").strip().upper()
+    if len(g) == 3:
+        try:
+            c = pycountry.countries.get(alpha_3=g)
+            if c and c.alpha_2:
+                return c.alpha_2
+        except Exception:
+            pass
+    return g
+
 def match_offers_impl(pairs, feed_data, conn, date_from, date_to):
     """三态匹配 + DB 指标查询"""
     if not date_to:
@@ -270,7 +283,7 @@ def match_offers_impl(pairs, feed_data, conn, date_from, date_to):
     all_matched_ids = []
     for pair in pairs:
         pkg = (pair.get("pkg","") or "").strip()
-        geo = (pair.get("geo","") or "").strip().upper()
+        geo = normalize_geo(pair.get("geo",""))
         entry = {"pkg": pkg, "geo": geo, "status": "red", "offers": [], "other_offers": []}
         if pkg in idx:
             if geo in idx[pkg]:
