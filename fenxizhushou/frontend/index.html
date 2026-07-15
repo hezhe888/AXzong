@@ -909,8 +909,10 @@ const AnomalyView = ({ data, onCopy }) => {
     if (!selectedDates.base || !selectedDates.target) return {};
     const getDailyMap = (date) => data.filter(d => String(d.Date) === date).reduce((acc, d) => {
       const oid = extractOfferId(d.Offer), pubId = d['Pub ID'] || 'Unknown', key = `${oid}_${pubId}`;
-      if (!acc[key]) acc[key] = { id: oid, pubId, revenue: 0, pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
+      if (!acc[key]) acc[key] = { id: oid, pubId, revenue: 0, click: 0, cbconv: 0, pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
       acc[key].revenue += (Number(d.Payout !== undefined ? d.Payout : d.Revenue) || 0);
+      acc[key].click += (Number(d.Click) || 0);
+      acc[key].cbconv += (Number(d['Callback Conversion']) || 0);
       return acc;
     }, {});
     const targetMap = getDailyMap(selectedDates.target);
@@ -933,7 +935,7 @@ const AnomalyView = ({ data, onCopy }) => {
         else if (hasAmt) isAnomaly = dropAmt >= Number(minDropAmt);
         else isAnomaly = dropAmt > 0;
         if (bRev >= minBaseRev && isAnomaly) {
-          if (!offerSearchTerm || maxMap[key].id.includes(offerSearchTerm)) res.push({ ...maxMap[key], baseRev: bRev, targetRev: tRev, drop: dropPct.toFixed(1), dropAmt: dropAmt, baseDateDetail: maxMap[key].maxDate });
+          if (!offerSearchTerm || maxMap[key].id.includes(offerSearchTerm)) res.push({ ...maxMap[key], baseRev: bRev, targetRev: tRev, drop: dropPct.toFixed(1), dropAmt: dropAmt, baseDateDetail: maxMap[key].maxDate, baseCvr: maxMap[key].click > 0 ? ((maxMap[key].cbconv || 0) / maxMap[key].click * 100).toFixed(2) : '0.00', targetCvr: targetMap[key]?.click > 0 ? (((targetMap[key]?.cbconv || 0) / targetMap[key].click) * 100).toFixed(2) : '0.00' });
         }
       });
     } else {
@@ -949,7 +951,7 @@ const AnomalyView = ({ data, onCopy }) => {
         else if (hasAmt) isAnomaly = dropAmt >= Number(minDropAmt);
         else isAnomaly = dropAmt > 0;
         if (bRev >= minBaseRev && isAnomaly) {
-          if (!offerSearchTerm || baseMap[key].id.includes(offerSearchTerm)) res.push({ ...baseMap[key], baseRev: bRev, targetRev: tRev, drop: dropPct.toFixed(1), dropAmt: dropAmt });
+          if (!offerSearchTerm || baseMap[key].id.includes(offerSearchTerm)) res.push({ ...baseMap[key], baseRev: bRev, targetRev: tRev, drop: dropPct.toFixed(1), dropAmt: dropAmt, baseCvr: baseMap[key].click > 0 ? ((baseMap[key].cbconv / baseMap[key].click) * 100).toFixed(2) : '0.00', targetCvr: (targetMap[key]?.click || 0) > 0 ? (((targetMap[key]?.cbconv || 0) / targetMap[key].click) * 100).toFixed(2) : '0.00' });
         }
       });
     }
@@ -1043,13 +1045,13 @@ const AnomalyView = ({ data, onCopy }) => {
             </div>
           </div>
           <table className="w-full text-left text-sm">
-            <thead><tr className="text-[10px] text-slate-400 uppercase"><th className="px-6 py-3">Offer ID</th><th className="px-6 py-3">{formatDateLabel(selectedDates.base)}</th><th className="px-6 py-3">{formatDateLabel(selectedDates.target)}</th><th className="px-6 py-3">跌幅比例</th><th className="px-6 py-3">跌幅金额</th></tr></thead>
+            <thead><tr className="text-[10px] text-slate-400 uppercase"><th className="px-6 py-3">Offer ID</th><th className="px-6 py-3">{formatDateLabel(selectedDates.base)} (CVR)</th><th className="px-6 py-3">{formatDateLabel(selectedDates.target)} (CVR)</th><th className="px-6 py-3">跌幅比例</th><th className="px-6 py-3">跌幅金额</th></tr></thead>
             <tbody>
               {items.map((it, i) => (
                 <tr key={i} className="border-b border-slate-50 hover:bg-blue-50/50 transition-colors group">
                   <td className="px-6 py-4"><button onClick={() => setSelectedOfferForDetail({ id: it.id })} className="font-bold text-slate-700 flex items-center gap-2 hover:text-blue-600 underline decoration-dotted underline-offset-4">{it.id} <I name="Maximize2" size={12} className="opacity-0 group-hover:opacity-100 transition-opacity"/></button></td>
-                  <td className="px-6 py-4 text-slate-500">${it.baseRev.toFixed(2)}{it.baseDateDetail && <span className="text-[10px] font-bold text-slate-400 ml-1.5 whitespace-nowrap">({getSmallDateLabel(it.baseDateDetail)})</span>}</td>
-                  <td className="px-6 py-4 text-rose-600 font-bold">${it.targetRev.toFixed(2)}</td>
+                  <td className="px-6 py-4 text-slate-500">${it.baseRev.toFixed(2)} <span className="text-[10px] text-emerald-600">({it.baseCvr}%)</span>{it.baseDateDetail && <span className="text-[10px] font-bold text-slate-400 ml-1.5 whitespace-nowrap">({getSmallDateLabel(it.baseDateDetail)})</span>}</td>
+                  <td className="px-6 py-4 text-rose-600 font-bold">${it.targetRev.toFixed(2)} <span className="text-[10px] text-emerald-600">({it.targetCvr}%)</span></td>
                   <td className="px-6 py-4 text-rose-600 font-black">-{it.drop}%</td>
                   <td className="px-6 py-4 text-rose-600 font-black">-${it.dropAmt.toFixed(2)}</td>
                 </tr>
