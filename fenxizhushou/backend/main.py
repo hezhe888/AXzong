@@ -187,6 +187,10 @@ async def update_feed_snapshot(pub_id: str = Query(...)):
     token = info.get("token", "") if isinstance(info, dict) else ""
     if not token:
         return {"error": "no token"}
+    # 删旧快照，强制重新拉取
+    snap_path = SNAPSHOT_DIR / f"{pub_id}.json"
+    if snap_path.exists():
+        snap_path.unlink()
     FEED_CACHE.clear()
     offers = await fetch_feed_all(pub_id, token)
     if isinstance(offers, dict) and "error" in offers:
