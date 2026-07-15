@@ -369,7 +369,7 @@ def generate_excel(results, stats, sep=",", checked_ids=None):
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
                          top=Side(style='thin'), bottom=Side(style='thin'))
 
-    headers = ["包名", "GEO", "状态", "Offer ID", "其他国家Offer ID"]
+    headers = ["包名", "GEO", "Offer ID", "其他国家Offer ID"]
     for c, h in enumerate(headers, 1):
         cell = ws.cell(row=1, column=c, value=h)
         cell.fill = header_fill
@@ -380,7 +380,6 @@ def generate_excel(results, stats, sep=",", checked_ids=None):
     row = 2
     for r in results:
         fill = green_fill if r["status"] == "green" else yellow_fill if r["status"] == "yellow" else red_fill
-        status_text = "🟢" if r["status"] == "green" else "🟡" if r["status"] == "yellow" else "🔴"
         if r["status"] == "green":
             ids = [o["id"] for o in r["offers"] if not checked or o["id"] in checked]
             # Skip row entirely if checked mode and no selected IDs in this row
@@ -393,7 +392,7 @@ def generate_excel(results, stats, sep=",", checked_ids=None):
                 continue
             oid_str = "无匹配" if r["status"] == "red" else ""
         other = ", ".join(r["other_offers"]) if r["other_offers"] else ""
-        vals = [r["pkg"], r["geo"], status_text, oid_str, other]
+        vals = [r["pkg"], r["geo"], oid_str, other]
         for c, v in enumerate(vals, 1):
             cell = ws.cell(row=row, column=c, value=v)
             cell.fill = fill
@@ -403,9 +402,8 @@ def generate_excel(results, stats, sep=",", checked_ids=None):
 
     ws.column_dimensions['A'].width = 48
     ws.column_dimensions['B'].width = 10
-    ws.column_dimensions['C'].width = 8
-    ws.column_dimensions['D'].width = 40
-    ws.column_dimensions['E'].width = 65
+    ws.column_dimensions['C'].width = 40
+    ws.column_dimensions['D'].width = 65
 
     # 统计 sheet
     ws2 = wb.create_sheet("统计")

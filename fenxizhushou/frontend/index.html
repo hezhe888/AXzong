@@ -1391,6 +1391,12 @@ const OfferMatchView = () => {
             <button onClick={()=>{setDateFrom(dayOffset(3));setDateTo(dayOffset(1));}} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">近3天</button>
             <button onClick={()=>{setDateFrom(dayOffset(7));setDateTo(dayOffset(1));}} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">近7天</button>
             <button onClick={()=>{setDateFrom(dayOffset(14));setDateTo(dayOffset(1));}} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">近14天</button>
+            <span className="w-px h-4 bg-slate-200 mx-1"></span>
+            <div className="flex bg-slate-200 p-0.5 rounded-lg">
+              {[{k:'ecpc',l:'eCPC↓'},{k:'feed',l:'Feed顺序'}].map(m => (
+                <button key={m.k} onClick={() => setSortMethod(m.k)} className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${sortMethod === m.k ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{m.l}</button>
+              ))}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3 text-[10px] text-slate-500">
@@ -1404,11 +1410,6 @@ const OfferMatchView = () => {
           className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-mono outline-none focus:ring-2 focus:ring-purple-500/20 resize-y"/>
         <div className="flex gap-3 items-center">
           <button onClick={doMatch} disabled={loading} className={`px-4 py-2 rounded-xl text-xs font-bold ${loading ? 'bg-slate-100 text-slate-400' : 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm'}`}>{loading ? '匹配中...' : '开始匹配'}</button>
-          <div className="flex bg-slate-100 p-0.5 rounded-lg">
-            {[{k:'ecpc',l:'eCPC↓'},{k:'feed',l:'Feed顺序'}].map(m => (
-              <button key={m.k} onClick={() => setSortMethod(m.k)} className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${sortMethod === m.k ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{m.l}</button>
-            ))}
-          </div>
           {result && !result.error && <>
             <button onClick={()=>downloadExcel(false)} className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">下载Excel(全量)</button>
             <button onClick={()=>downloadExcel(true)} className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm">下载Excel(已选)</button>
