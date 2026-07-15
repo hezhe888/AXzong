@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>数据分析助手</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
 <script src="tailwind.min.js"></script>
 <script src="react.min.js"></script>
 <script src="react-dom.min.js"></script>
@@ -1508,7 +1509,7 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
       localStats[pubId][oid].cbconv += (Number(d['Callback Conversion']) || 0);
     });
     return pubs.map(pub => {
-      const isSameAdv = (pS, aS) => { const cP = pS.replace(/^\d+-/, '').toLowerCase().trim(), cA = aS.replace(/^\d+-/, '').toLowerCase().trim(); return cP === cA || (cP.length > 2 && cA.length > 2 && (cP.includes(cA) || cA.includes(cP))); };
+      const isSameAdv = (pubId, advId) => { const pi = pubNameMap[pubId]; const pn = (typeof pi === 'string' ? pi : pi?.name || '').toLowerCase().trim(); const an = (advNameMap[advId] || '').toLowerCase().trim(); if (!pn || !an) return false; return pn === an || (pn.length > 2 && an.length > 2 && (pn.includes(an) || an.includes(pn))); };
       const blueOcean = Object.values(globalStats).map(o => ({...o, cvr: o.totalClick > 0 ? (o.totalConv / o.totalClick) * 100 : 0, ecpc: o.totalClick > 0 ? (o.totalPayout / o.totalClick) * 1000 : 0})).filter(o => !o.byPub[pub] && !isSameAdv(pub, o.advertiserId) && (o.totalRev >= filters.minRevenue) && (o.totalConv >= filters.minConv) && (o.ecpc >= filters.minEcpcBlue) && (o.cvr >= filters.minCvrBlue)).sort((a,b)=>b.totalRev-a.totalRev);
       const pubOffers = Object.values(localStats[pub]).map(o => ({...o, ecpc: o.click > 0 ? ((o.payout/o.click)*1000) : 0, cvr: o.click > 0 ? ((o.cbconv/o.click)*100) : 0})).filter(o => o.payout >= filters.minPayout && o.ecpc >= filters.minEcpc && o.cvr >= filters.minCvr && o.click >= filters.minClickEcpc);
       return { pub, blueOcean, topEcpc: [...pubOffers].sort((a,b)=>b.ecpc-a.ecpc).slice(0, 20), topCvr: [...pubOffers].sort((a,b)=>b.cvr-a.cvr).slice(0, 20) };
