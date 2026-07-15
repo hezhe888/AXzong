@@ -1324,6 +1324,9 @@ const OfferMatchView = () => {
   const [snapshot, setSnapshot] = useState(null);
   const [availableDates, setAvailableDates] = useState([]);
   const [sortMethod, setSortMethod] = useState('ecpc');
+  const [minRev, setMinRev] = useState(1);
+  const [minEcpc, setMinEcpc] = useState(0.2);
+  const [minCvr, setMinCvr] = useState(0.2);
   const pubOptions = useMemo(() => {
     return Object.entries(pubNameMap).map(([k, v]) => ({ label: typeof v === 'string' ? `${k}-${v}` : `${k}-${v.name}`, value: k }));
   }, []);
@@ -1335,7 +1338,7 @@ const OfferMatchView = () => {
   const doMatch = async () => {
     setLoading(true);
     try {
-      const body = JSON.stringify({ pairs: parsePairs(), date_from: dateFrom, date_to: dateTo, sort_mode: sortMethod });
+      const body = JSON.stringify({ pairs: parsePairs(), date_from: dateFrom, date_to: dateTo, sort_mode: sortMethod, min_rev: minRev, min_ecpc: minEcpc, min_cvr: minCvr });
       const res = await fetch('/api/match-offers?pub_id=' + pubId, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
       const data = await res.json();
       setResult(data);
@@ -1347,7 +1350,7 @@ const OfferMatchView = () => {
   };
 
   const downloadExcel = (checked) => {
-    const body = JSON.stringify({ pairs: parsePairs(), date_from: dateFrom, date_to: dateTo, format: 'xlsx', sep: sepMode, checked_ids: checked ? Array.from(selectedIds) : [], sort_mode: sortMethod });
+    const body = JSON.stringify({ pairs: parsePairs(), date_from: dateFrom, date_to: dateTo, format: 'xlsx', sep: sepMode, checked_ids: checked ? Array.from(selectedIds) : [], sort_mode: sortMethod, min_rev: minRev, min_ecpc: minEcpc, min_cvr: minCvr });
     fetch('/api/match-offers?pub_id=' + pubId, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).then(r => r.blob()).then(blob => {
       const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'offer_match.xlsx'; a.click(); URL.revokeObjectURL(url);
     }).catch(e => console.error(e));
@@ -1398,6 +1401,12 @@ const OfferMatchView = () => {
               ))}
             </div>
           </div>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] text-slate-500">
+          <span className="font-bold">筛选: </span>
+          <span>Rev≥</span><input type="number" step="any" value={minRev} onChange={e => setMinRev(Number(e.target.value))} className="w-16 bg-slate-50 border rounded px-1.5 py-0.5 text-xs font-bold outline-none"/>
+          <span>eCPC≥</span><input type="number" step="any" value={minEcpc} onChange={e => setMinEcpc(Number(e.target.value))} className="w-16 bg-slate-50 border rounded px-1.5 py-0.5 text-xs font-bold outline-none"/>
+          <span>CVR≥</span><input type="number" step="any" value={minCvr} onChange={e => setMinCvr(Number(e.target.value))} className="w-16 bg-slate-50 border rounded px-1.5 py-0.5 text-xs font-bold outline-none"/><span>%</span>
         </div>
         <div className="flex items-center gap-3 text-[10px] text-slate-500">
           <span className="font-bold">快照: </span>

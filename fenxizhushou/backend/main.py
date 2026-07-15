@@ -272,7 +272,7 @@ def normalize_geo(geo):
             pass
     return g
 
-def match_offers_impl(pairs, feed_data, conn, date_from, date_to, sort_mode="ecpc"):
+def match_offers_impl(pairs, feed_data, conn, date_from, date_to, sort_mode="ecpc", min_rev=1, min_ecpc=0.2, min_cvr=0.2):
     """三态匹配 + DB 指标查询。sort_mode: ecpc | feed"""
     if not date_to:
         date_to = datetime.utcnow().strftime("%Y%m%d")
@@ -346,6 +346,7 @@ def match_offers_impl(pairs, feed_data, conn, date_from, date_to, sort_mode="ecp
                                   "ecpc": m.get("ecpc", 0), "cvr": m.get("cvr", 0)}
         if sort_mode == "ecpc":
             entry["offers"] = sorted(entry["offers"], key=lambda o: o["ecpc"], reverse=True)[:3]
+        entry["offers"] = [o for o in entry["offers"] if o["rev"] >= min_rev and o["ecpc"] >= min_ecpc and o["cvr"] >= min_cvr][:3]
 
     stats = {"total": len(results), "green": sum(1 for r in results if r["status"] == "green"),
              "yellow": sum(1 for r in results if r["status"] == "yellow"),
@@ -434,6 +435,9 @@ async def match_offers_endpoint(pub_id: str = Query(...), request: Request = Non
         sep = body.get("sep", ",")
         checked_ids = body.get("checked_ids", [])
         sort_mode = body.get("sort_mode", "ecpc")
+        min_rev = float(body.get("min_rev", 1))
+        min_ecpc = float(body.get("min_ecpc", 0.2))
+        min_cvr = float(body.get("min_cvr", 0.2))
     else:
         pairs_raw = request.query_params.get("pairs", "[]") if request else "[]"
         try:
@@ -461,7 +465,7 @@ async def match_offers_endpoint(pub_id: str = Query(...), request: Request = Non
 
     conn = get_conn()
     try:
-        results, stats = match_offers_impl(pairs, offers, conn, date_from, date_to, sort_mode)
+        results, stats = match_offers_impl(pairs, offers, conn, date_from, date_to, sort_mode, min_rev, min_ecpc, min_cvr)
     finally:
         conn.close()
 
