@@ -1325,9 +1325,11 @@ const OfferMatchView = () => {
   const [snapshot, setSnapshot] = useState(null);
   const [availableDates, setAvailableDates] = useState([]);
   const [sortMethod, setSortMethod] = useState('ecpc');
-  const [minRev, setMinRev] = useState(1);
-  const [minEcpc, setMinEcpc] = useState(0.2);
-  const [minCvr, setMinCvr] = useState(0.2);
+  const [minRev, setMinRev] = useState(0);
+  const [minEcpc, setMinEcpc] = useState(0);
+  const [minCvr, setMinCvr] = useState(0);
+  const [tokenModal, setTokenModal] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
   const pubOptions = useMemo(() => {
     return Object.entries(pubNameMap).map(([k, v]) => ({ label: typeof v === 'string' ? `${k}-${v}` : `${k}-${v.name}`, value: k }));
   }, []);
@@ -1369,10 +1371,18 @@ const OfferMatchView = () => {
   const copyFmt = () => { const lines = []; (result?.matches || []).forEach((m, mi) => { m.offers.forEach(o => { if (selectedIds.has(o.id)) lines.push(`${o.id}|${m.pkg}|${m.geo}`); }); if (selectedYellow.has(mi)) m.other_offers.forEach(o => lines.push(`${o.split('-')[0]}|${m.pkg}|${m.geo}`)); }); copyToClipboard(lines.join('\n')); };
 
   const updateSnapshot = async () => {
+    if (!getToken(pubId)) { setTokenInput(''); setTokenModal(true); return; }
     setSnapshot(null);
     const r = await fetch('/api/feed-snapshot?pub_id='+pubId, {method:'POST'});
     const data = await r.json();
+    if (data.error && data.error.includes('no token')) { setTokenInput(''); setTokenModal(true); return; }
     setSnapshot(data);
+  };
+
+  const saveToken = async () => {
+    await fetch(`/api/pub-token?pub_id=${pubId}&token=${encodeURIComponent(tokenInput)}`, {method:'POST'});
+    setTokenModal(false);
+    fetchPubNames().then(() => updateSnapshot());
   };
 
   return (
@@ -1481,6 +1491,18 @@ const OfferMatchView = () => {
           </>
         )}
         {result && result.error && <div className="text-rose-600 font-bold text-sm">{result.error}</div>}
+        {tokenModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md flex flex-col gap-4">
+              <h3 className="font-black text-slate-800 text-lg">{getPubLabel(pubId)} 未配置 Token</h3>
+              <input value={tokenInput} onChange={e => setTokenInput(e.target.value)} placeholder="请输入 Feed API Token" className="bg-slate-50 border rounded-xl px-4 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-purple-500/20"/>
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setTokenModal(false)} className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600">取消</button>
+                <button onClick={saveToken} disabled={!tokenInput} className={`px-4 py-2 rounded-xl text-xs font-bold ${tokenInput ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-slate-100 text-slate-400'}`}>保存并重试</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

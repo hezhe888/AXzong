@@ -202,6 +202,24 @@ async def update_feed_snapshot(pub_id: str = Query(...)):
         json.dump(data, f, ensure_ascii=False)
     return {"exists": True, "timestamp": data["timestamp"], "count": len(offers)}
 
+@app.post("/api/pub-token")
+async def save_pub_token(pub_id: str = Query(...), token: str = Query(...)):
+    path = Path(__file__).resolve().parent.parent / "pub_mapping.json"
+    data = {}
+    if path.exists():
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    if pub_id not in data:
+        return {"error": "pub_id not found"}
+    if isinstance(data[pub_id], str):
+        data[pub_id] = {"name": data[pub_id], "token": token}
+    else:
+        data[pub_id]["token"] = token
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    # 同时更新全局 pubNameMap（需要前端重新 fetch）
+    return {"success": True}
+
 async def fetch_feed_all(pub_id: str, token: str):
     """全量拉取 Feed API，优先用快照，24h 内有效"""
     cache_key = f"feed_{pub_id}"
@@ -272,7 +290,7 @@ def normalize_geo(geo):
             pass
     return g
 
-def match_offers_impl(pairs, feed_data, conn, date_from, date_to, sort_mode="ecpc", min_rev=1, min_ecpc=0.2, min_cvr=0.2):
+def match_offers_impl(pairs, feed_data, conn, date_from, date_to, sort_mode="ecpc", min_rev=0, min_ecpc=0, min_cvr=0):
     """三态匹配 + DB 指标查询。sort_mode: ecpc | feed"""
     if not date_to:
         date_to = datetime.utcnow().strftime("%Y%m%d")
@@ -435,9 +453,9 @@ async def match_offers_endpoint(pub_id: str = Query(...), request: Request = Non
         sep = body.get("sep", ",")
         checked_ids = body.get("checked_ids", [])
         sort_mode = body.get("sort_mode", "ecpc")
-        min_rev = float(body.get("min_rev", 1))
-        min_ecpc = float(body.get("min_ecpc", 0.2))
-        min_cvr = float(body.get("min_cvr", 0.2))
+        min_rev = float(body.get("min_rev", 0))
+        min_ecpc = float(body.get("min_ecpc", 0))
+        min_cvr = float(body.get("min_cvr", 0))
     else:
         pairs_raw = request.query_params.get("pairs", "[]") if request else "[]"
         try:
