@@ -272,8 +272,8 @@ def normalize_geo(geo):
             pass
     return g
 
-def match_offers_impl(pairs, feed_data, conn, date_from, date_to):
-    """三态匹配 + DB 指标查询"""
+def match_offers_impl(pairs, feed_data, conn, date_from, date_to, sort_mode="ecpc"):
+    """三态匹配 + DB 指标查询。sort_mode: ecpc | feed"""
     if not date_to:
         date_to = datetime.utcnow().strftime("%Y%m%d")
     if not date_from:
@@ -288,7 +288,7 @@ def match_offers_impl(pairs, feed_data, conn, date_from, date_to):
         if pkg in idx:
             if geo in idx[pkg]:
                 entry["status"] = "green"
-                entry["offers"] = idx[pkg][geo][:3]
+                entry["offers"] = idx[pkg][geo][:3] if sort_mode == "feed" else idx[pkg][geo]
                 all_matched_ids.extend(entry["offers"])
             else:
                 entry["status"] = "yellow"
@@ -344,6 +344,8 @@ def match_offers_impl(pairs, feed_data, conn, date_from, date_to):
             adv_name = adv_map.get(adv_id, adv_id)
             entry["offers"][i] = {"id": oid, "adv": adv_name, "rev": m.get("rev", 0), "click": m.get("click", 0),
                                   "ecpc": m.get("ecpc", 0), "cvr": m.get("cvr", 0)}
+        if sort_mode == "ecpc":
+            entry["offers"] = sorted(entry["offers"], key=lambda o: o["ecpc"], reverse=True)[:3]
 
     stats = {"total": len(results), "green": sum(1 for r in results if r["status"] == "green"),
              "yellow": sum(1 for r in results if r["status"] == "yellow"),
@@ -433,6 +435,7 @@ async def match_offers_endpoint(pub_id: str = Query(...), request: Request = Non
         date_to = body.get("date_to", "")
         sep = body.get("sep", ",")
         checked_ids = body.get("checked_ids", [])
+        sort_mode = body.get("sort_mode", "ecpc")
     else:
         pairs_raw = request.query_params.get("pairs", "[]") if request else "[]"
         try:
@@ -460,7 +463,7 @@ async def match_offers_endpoint(pub_id: str = Query(...), request: Request = Non
 
     conn = get_conn()
     try:
-        results, stats = match_offers_impl(pairs, offers, conn, date_from, date_to)
+        results, stats = match_offers_impl(pairs, offers, conn, date_from, date_to, sort_mode)
     finally:
         conn.close()
 

@@ -1146,7 +1146,7 @@ const CapWarningView = ({ data, onCopy }) => {
             </div>
             <table className="w-full text-left text-sm">
               <thead className="bg-white text-[10px] uppercase text-slate-500 border-b border-slate-100"><tr><th className="px-6 py-4">Adv Offer ID</th><th className="px-6 py-4">归属 ADV</th><th className="px-6 py-4">连续相同天数</th><th className="px-6 py-4">触发日期详情</th><th className="px-6 py-4 text-amber-600">转化数</th><th className="px-6 py-4">最新当日营收</th></tr></thead>
-              <tbody>{items.map((w, i) => (<tr key={i} className="border-b border-slate-50 hover:bg-slate-50"><td className="px-6 py-4 font-bold text-slate-700">{w.id}</td><td className="px-6 py-4 text-slate-500 font-medium">{adv}</td><td className="px-6 py-4 font-black text-amber-600">{w.daysCount} 天</td><td className="px-6 py-4 text-slate-500 text-xs">{w.pairDetails}</td><td className="px-6 py-4 font-black text-amber-600">{w.conv}</td><td className="px-6 py-4 font-bold text-slate-700">${w.latestRev.toFixed(2)}</td></tr>))}</tbody>
+              <tbody>{items.map((w, i) => (<tr key={i} className="border-b border-slate-50 hover:bg-slate-50"><td className="px-6 py-4 font-bold text-slate-700">{w.id}</td><td className="px-6 py-4 text-slate-500 font-medium">{getAdvLabel(adv)}</td><td className="px-6 py-4 font-black text-amber-600">{w.daysCount} 天</td><td className="px-6 py-4 text-slate-500 text-xs">{w.pairDetails}</td><td className="px-6 py-4 font-black text-amber-600">{w.conv}</td><td className="px-6 py-4 font-bold text-slate-700">${w.latestRev.toFixed(2)}</td></tr>))}</tbody>
             </table>
           </div>
         );
@@ -1323,6 +1323,7 @@ const OfferMatchView = () => {
   const [dateTo, setDateTo] = useState(dayOffset(1));
   const [snapshot, setSnapshot] = useState(null);
   const [availableDates, setAvailableDates] = useState([]);
+  const [sortMethod, setSortMethod] = useState('ecpc');
   const pubOptions = useMemo(() => {
     return Object.entries(pubNameMap).map(([k, v]) => ({ label: typeof v === 'string' ? `${k}-${v}` : `${k}-${v.name}`, value: k }));
   }, []);
@@ -1334,7 +1335,7 @@ const OfferMatchView = () => {
   const doMatch = async () => {
     setLoading(true);
     try {
-      const body = JSON.stringify({ pairs: parsePairs(), date_from: dateFrom, date_to: dateTo });
+      const body = JSON.stringify({ pairs: parsePairs(), date_from: dateFrom, date_to: dateTo, sort_mode: sortMethod });
       const res = await fetch('/api/match-offers?pub_id=' + pubId, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
       const data = await res.json();
       setResult(data);
@@ -1346,7 +1347,7 @@ const OfferMatchView = () => {
   };
 
   const downloadExcel = (checked) => {
-    const body = JSON.stringify({ pairs: parsePairs(), date_from: dateFrom, date_to: dateTo, format: 'xlsx', sep: sepMode, checked_ids: checked ? Array.from(selectedIds) : [] });
+    const body = JSON.stringify({ pairs: parsePairs(), date_from: dateFrom, date_to: dateTo, format: 'xlsx', sep: sepMode, checked_ids: checked ? Array.from(selectedIds) : [], sort_mode: sortMethod });
     fetch('/api/match-offers?pub_id=' + pubId, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).then(r => r.blob()).then(blob => {
       const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'offer_match.xlsx'; a.click(); URL.revokeObjectURL(url);
     }).catch(e => console.error(e));
@@ -1403,6 +1404,11 @@ const OfferMatchView = () => {
           className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-mono outline-none focus:ring-2 focus:ring-purple-500/20 resize-y"/>
         <div className="flex gap-3 items-center">
           <button onClick={doMatch} disabled={loading} className={`px-4 py-2 rounded-xl text-xs font-bold ${loading ? 'bg-slate-100 text-slate-400' : 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm'}`}>{loading ? '匹配中...' : '开始匹配'}</button>
+          <div className="flex bg-slate-100 p-0.5 rounded-lg">
+            {[{k:'ecpc',l:'eCPC↓'},{k:'feed',l:'Feed顺序'}].map(m => (
+              <button key={m.k} onClick={() => setSortMethod(m.k)} className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${sortMethod === m.k ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{m.l}</button>
+            ))}
+          </div>
           {result && !result.error && <>
             <button onClick={()=>downloadExcel(false)} className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">下载Excel(全量)</button>
             <button onClick={()=>downloadExcel(true)} className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm">下载Excel(已选)</button>
