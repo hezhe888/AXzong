@@ -1334,7 +1334,7 @@ const OfferMatchView = () => {
     return Object.entries(pubNameMap).map(([k, v]) => ({ label: typeof v === 'string' ? `${k}-${v}` : `${k}-${v.name}`, value: k }));
   }, []);
   const getToken = (pid) => { const info = pubNameMap[pid]; return info && typeof info === 'object' ? (info.token || '') : ''; };
-  const parsePairs = () => pairs.split(/[\r\n]+/).map(l => { const p = l.split(/\s+/); return { pkg: (p[0] || '').trim(), geo: (p[1] || '').trim() }; }).filter(x => x.pkg && x.geo);
+  const parsePairs = () => { const result = []; pairs.split(/[\r\n]+/).forEach(l => { const p = l.split(/\s+/); const pkg = (p[0] || '').trim(); if (!pkg) return; (p[1] || '').replace(/[^A-Za-z]+/g, ' ').split(/\s+/).forEach(g => { g = g.trim().toUpperCase(); if (g) result.push({ pkg, geo: g }); }); }); return result; };
 
   useEffect(() => { fetch('/api/feed-snapshot?pub_id='+pubId).then(r=>r.json()).then(setSnapshot); fetchDates().then(setAvailableDates); }, [pubId]);
 
