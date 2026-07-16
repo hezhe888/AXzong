@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>数据分析助手</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
 <script src="tailwind.min.js"></script>
 <script src="react.min.js"></script>
 <script src="react-dom.min.js"></script>
@@ -126,8 +127,10 @@ const fetchPubNames = async () => {
 const getPubLabel = (mid) => {
   const m = String(mid);
   if (m === 'jk-all') return 'JK综合';
-  const name = pubNameMap[m];
-  return name ? `${m}-${name}` : m;
+  const v = pubNameMap[m];
+  if (!v) return m;
+  if (typeof v === 'string') return `${m}-${v}`;
+  return `${m}-${v.name}`;
 };
 
 const getAdvLabel = (src) => {
@@ -906,8 +909,10 @@ const AnomalyView = ({ data, onCopy }) => {
     if (!selectedDates.base || !selectedDates.target) return {};
     const getDailyMap = (date) => data.filter(d => String(d.Date) === date).reduce((acc, d) => {
       const oid = extractOfferId(d.Offer), pubId = d['Pub ID'] || 'Unknown', key = `${oid}_${pubId}`;
-      if (!acc[key]) acc[key] = { id: oid, pubId, revenue: 0, pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
+      if (!acc[key]) acc[key] = { id: oid, pubId, revenue: 0, click: 0, cbconv: 0, pkg: d['Package Name'] || '', geo: d['Adv GEO'] || d['Country'] || '' };
       acc[key].revenue += (Number(d.Payout !== undefined ? d.Payout : d.Revenue) || 0);
+      acc[key].click += (Number(d.Click) || 0);
+      acc[key].cbconv += (Number(d['Callback Conversion']) || 0);
       return acc;
     }, {});
     const targetMap = getDailyMap(selectedDates.target);
@@ -930,7 +935,7 @@ const AnomalyView = ({ data, onCopy }) => {
         else if (hasAmt) isAnomaly = dropAmt >= Number(minDropAmt);
         else isAnomaly = dropAmt > 0;
         if (bRev >= minBaseRev && isAnomaly) {
-          if (!offerSearchTerm || maxMap[key].id.includes(offerSearchTerm)) res.push({ ...maxMap[key], baseRev: bRev, targetRev: tRev, drop: dropPct.toFixed(1), dropAmt: dropAmt, baseDateDetail: maxMap[key].maxDate });
+          if (!offerSearchTerm || maxMap[key].id.includes(offerSearchTerm)) res.push({ ...maxMap[key], baseRev: bRev, targetRev: tRev, drop: dropPct.toFixed(1), dropAmt: dropAmt, baseDateDetail: maxMap[key].maxDate, baseCvr: maxMap[key].click > 0 ? ((maxMap[key].cbconv || 0) / maxMap[key].click * 100).toFixed(2) : '0.00', targetCvr: targetMap[key]?.click > 0 ? (((targetMap[key]?.cbconv || 0) / targetMap[key].click) * 100).toFixed(2) : '0.00' });
         }
       });
     } else {
@@ -946,7 +951,7 @@ const AnomalyView = ({ data, onCopy }) => {
         else if (hasAmt) isAnomaly = dropAmt >= Number(minDropAmt);
         else isAnomaly = dropAmt > 0;
         if (bRev >= minBaseRev && isAnomaly) {
-          if (!offerSearchTerm || baseMap[key].id.includes(offerSearchTerm)) res.push({ ...baseMap[key], baseRev: bRev, targetRev: tRev, drop: dropPct.toFixed(1), dropAmt: dropAmt });
+          if (!offerSearchTerm || baseMap[key].id.includes(offerSearchTerm)) res.push({ ...baseMap[key], baseRev: bRev, targetRev: tRev, drop: dropPct.toFixed(1), dropAmt: dropAmt, baseCvr: baseMap[key].click > 0 ? ((baseMap[key].cbconv / baseMap[key].click) * 100).toFixed(2) : '0.00', targetCvr: (targetMap[key]?.click || 0) > 0 ? (((targetMap[key]?.cbconv || 0) / targetMap[key].click) * 100).toFixed(2) : '0.00' });
         }
       });
     }
@@ -1040,13 +1045,13 @@ const AnomalyView = ({ data, onCopy }) => {
             </div>
           </div>
           <table className="w-full text-left text-sm">
-            <thead><tr className="text-[10px] text-slate-400 uppercase"><th className="px-6 py-3">Offer ID</th><th className="px-6 py-3">{formatDateLabel(selectedDates.base)}</th><th className="px-6 py-3">{formatDateLabel(selectedDates.target)}</th><th className="px-6 py-3">跌幅比例</th><th className="px-6 py-3">跌幅金额</th></tr></thead>
+            <thead><tr className="text-[10px] text-slate-400 uppercase"><th className="px-6 py-3">Offer ID</th><th className="px-6 py-3">{formatDateLabel(selectedDates.base)} (CVR)</th><th className="px-6 py-3">{formatDateLabel(selectedDates.target)} (CVR)</th><th className="px-6 py-3">跌幅比例</th><th className="px-6 py-3">跌幅金额</th></tr></thead>
             <tbody>
               {items.map((it, i) => (
                 <tr key={i} className="border-b border-slate-50 hover:bg-blue-50/50 transition-colors group">
                   <td className="px-6 py-4"><button onClick={() => setSelectedOfferForDetail({ id: it.id })} className="font-bold text-slate-700 flex items-center gap-2 hover:text-blue-600 underline decoration-dotted underline-offset-4">{it.id} <I name="Maximize2" size={12} className="opacity-0 group-hover:opacity-100 transition-opacity"/></button></td>
-                  <td className="px-6 py-4 text-slate-500">${it.baseRev.toFixed(2)}{it.baseDateDetail && <span className="text-[10px] font-bold text-slate-400 ml-1.5 whitespace-nowrap">({getSmallDateLabel(it.baseDateDetail)})</span>}</td>
-                  <td className="px-6 py-4 text-rose-600 font-bold">${it.targetRev.toFixed(2)}</td>
+                  <td className="px-6 py-4 text-slate-500">${it.baseRev.toFixed(2)} <span className="text-[10px] text-emerald-600">({it.baseCvr}%)</span>{it.baseDateDetail && <span className="text-[10px] font-bold text-slate-400 ml-1.5 whitespace-nowrap">({getSmallDateLabel(it.baseDateDetail)})</span>}</td>
+                  <td className="px-6 py-4 text-rose-600 font-bold">${it.targetRev.toFixed(2)} <span className="text-[10px] text-emerald-600">({it.targetCvr}%)</span></td>
                   <td className="px-6 py-4 text-rose-600 font-black">-{it.drop}%</td>
                   <td className="px-6 py-4 text-rose-600 font-black">-${it.dropAmt.toFixed(2)}</td>
                 </tr>
@@ -1136,12 +1141,12 @@ const CapWarningView = ({ data, onCopy }) => {
         return (
           <div key={adv} className="bg-white rounded-2xl border overflow-hidden shadow-sm">
             <div className="px-6 py-4 bg-slate-50 border-b flex justify-between items-center">
-              <span className="font-bold text-xs uppercase text-slate-700">归属广告主: {adv} ({items.length} 个预警)</span>
+              <span className="font-bold text-xs uppercase text-slate-700">归属广告主: {getAdvLabel(adv)} ({items.length} 个预警)</span>
               <button onClick={() => onCopy(uniqueIds.join('|'))} className="bg-amber-50 border border-amber-200 text-amber-600 px-4 py-2 rounded-xl text-[10px] font-bold flex items-center gap-2 shadow-sm hover:bg-amber-100"><I name="Copy" size={12}/> 复制 Adv Offer IDs ({uniqueIds.length})</button>
             </div>
             <table className="w-full text-left text-sm">
               <thead className="bg-white text-[10px] uppercase text-slate-500 border-b border-slate-100"><tr><th className="px-6 py-4">Adv Offer ID</th><th className="px-6 py-4">归属 ADV</th><th className="px-6 py-4">连续相同天数</th><th className="px-6 py-4">触发日期详情</th><th className="px-6 py-4 text-amber-600">转化数</th><th className="px-6 py-4">最新当日营收</th></tr></thead>
-              <tbody>{items.map((w, i) => (<tr key={i} className="border-b border-slate-50 hover:bg-slate-50"><td className="px-6 py-4 font-bold text-slate-700">{w.id}</td><td className="px-6 py-4 text-slate-500 font-medium">{adv}</td><td className="px-6 py-4 font-black text-amber-600">{w.daysCount} 天</td><td className="px-6 py-4 text-slate-500 text-xs">{w.pairDetails}</td><td className="px-6 py-4 font-black text-amber-600">{w.conv}</td><td className="px-6 py-4 font-bold text-slate-700">${w.latestRev.toFixed(2)}</td></tr>))}</tbody>
+              <tbody>{items.map((w, i) => (<tr key={i} className="border-b border-slate-50 hover:bg-slate-50"><td className="px-6 py-4 font-bold text-slate-700">{w.id}</td><td className="px-6 py-4 text-slate-500 font-medium">{getAdvLabel(adv)}</td><td className="px-6 py-4 font-black text-amber-600">{w.daysCount} 天</td><td className="px-6 py-4 text-slate-500 text-xs">{w.pairDetails}</td><td className="px-6 py-4 font-black text-amber-600">{w.conv}</td><td className="px-6 py-4 font-bold text-slate-700">${w.latestRev.toFixed(2)}</td></tr>))}</tbody>
             </table>
           </div>
         );
@@ -1247,7 +1252,7 @@ const IdJoinerView = () => {
   const [sep, setSep] = useState('|');
   const [mode, setMode] = useState('join');
   const extractIds = (text) => {
-    const tokens = text.split(/[|,;\s\r\n]+/).filter(Boolean);
+    const tokens = text.replace(/[^\d]+/g, ' ').trim().split(/\s+/).filter(Boolean);
     const ids = []; const seen = new Set();
     tokens.forEach(t => {
       const tid = extractOfferId(t.trim());
@@ -1307,6 +1312,211 @@ const IdJoinerView = () => {
   );
 };
 
+const OfferMatchView = () => {
+  const [pairs, setPairs] = useState('');
+  const [pubId, setPubId] = useState('130119');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [selectedYellow, setSelectedYellow] = useState(new Set());
+  const [sepMode, setSepMode] = useState('|');
+  const [dateFrom, setDateFrom] = useState(dayOffset(7));
+  const [dateTo, setDateTo] = useState(dayOffset(1));
+  const [snapshot, setSnapshot] = useState(null);
+  const [availableDates, setAvailableDates] = useState([]);
+  const [sortMethod, setSortMethod] = useState('ecpc');
+  const [minRev, setMinRev] = useState(0);
+  const [minEcpc, setMinEcpc] = useState(0);
+  const [minCvr, setMinCvr] = useState(0);
+  const [tokenModal, setTokenModal] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
+  const pubOptions = useMemo(() => {
+    return Object.entries(pubNameMap).map(([k, v]) => ({ label: typeof v === 'string' ? `${k}-${v}` : `${k}-${v.name}`, value: k }));
+  }, []);
+  const getToken = (pid) => { const info = pubNameMap[pid]; return info && typeof info === 'object' ? (info.token || '') : ''; };
+  const parsePairs = () => pairs.split(/[\r\n]+/).map(l => { const p = l.split(/\s+/); return { pkg: (p[0] || '').trim(), geo: (p[1] || '').trim() }; }).filter(x => x.pkg && x.geo);
+
+  useEffect(() => { fetch('/api/feed-snapshot?pub_id='+pubId).then(r=>r.json()).then(setSnapshot); fetchDates().then(setAvailableDates); }, [pubId]);
+
+  const doMatch = async () => {
+    setLoading(true);
+    try {
+      const body = JSON.stringify({ pairs: parsePairs(), date_from: dateFrom, date_to: dateTo, sort_mode: sortMethod, min_rev: minRev, min_ecpc: minEcpc, min_cvr: minCvr });
+      const res = await fetch('/api/match-offers?pub_id=' + pubId, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+      const data = await res.json();
+      setResult(data);
+      const allIds = new Set();
+      (data.matches || []).forEach(m => { if (m.status === 'green') m.offers.forEach(o => allIds.add(o.id)); });
+      setSelectedIds(allIds);
+    } catch (e) { setResult({ error: e.message }); }
+    setLoading(false);
+  };
+
+  const downloadExcel = (checked) => {
+    const body = JSON.stringify({ pairs: parsePairs(), date_from: dateFrom, date_to: dateTo, format: 'xlsx', sep: sepMode, checked_ids: checked ? Array.from(selectedIds) : [], sort_mode: sortMethod, min_rev: minRev, min_ecpc: minEcpc, min_cvr: minCvr });
+    fetch('/api/match-offers?pub_id=' + pubId, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).then(r => r.blob()).then(blob => {
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'offer_match.xlsx'; a.click(); URL.revokeObjectURL(url);
+    }).catch(e => console.error(e));
+  };
+
+  const handleCheck = (oid, checked) => { setSelectedIds(prev => { const next = new Set(prev); checked ? next.add(oid) : next.delete(oid); return next; }); };
+  const toggleAll = () => {
+    if (!result) return;
+    const allIds = new Set(); const allYellows = new Set();
+    result.matches.forEach((m, mi) => { if (m.status === 'green') m.offers.forEach(o => allIds.add(o.id)); if (m.other_offers.length > 0) allYellows.add(mi); });
+    if (selectedIds.size === allIds.size && allIds.size > 0 && selectedYellow.size === allYellows.size) { setSelectedIds(new Set()); setSelectedYellow(new Set()); }
+    else { setSelectedIds(allIds); setSelectedYellow(allYellows); }
+  };
+  const copyIds = () => { const ids = []; (result?.matches || []).forEach((m, mi) => { m.offers.forEach(o => { if (selectedIds.has(o.id)) ids.push(o.id); }); if (selectedYellow.has(mi)) m.other_offers.forEach(o => ids.push(o.split('-')[0])); }); copyToClipboard(ids.join(sepMode === '|' ? '|' : ',')); };
+  const copyFmt = () => { const lines = []; (result?.matches || []).forEach((m, mi) => { m.offers.forEach(o => { if (selectedIds.has(o.id)) lines.push(`${o.id}|${m.pkg}|${m.geo}`); }); if (selectedYellow.has(mi)) m.other_offers.forEach(o => lines.push(`${o.split('-')[0]}|${m.pkg}|${m.geo}`)); }); copyToClipboard(lines.join('\n')); };
+
+  const updateSnapshot = async () => {
+    if (!getToken(pubId)) { setTokenInput(''); setTokenModal(true); return; }
+    setSnapshot(null);
+    const r = await fetch('/api/feed-snapshot?pub_id='+pubId, {method:'POST'});
+    const data = await r.json();
+    if (data.error) {
+      if (data.error.includes('no token')) { setTokenInput(''); setTokenModal(true); return; }
+      setSnapshot(data);
+      return;
+    }
+    setSnapshot(data);
+  };
+
+  const saveToken = async () => {
+    await fetch(`/api/pub-token?pub_id=${pubId}&token=${encodeURIComponent(tokenInput)}`, {method:'POST'});
+    setTokenModal(false);
+    fetchPubNames().then(() => updateSnapshot());
+  };
+
+  return (
+    <div className="space-y-6 w-full" style={{minHeight: 'calc(100vh - 200px)'}}>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-4">
+        <h3 className="font-black text-slate-800 text-lg flex items-center gap-2"><I name="Search" size={20} color="#8b5cf6"/> offer匹配</h3>
+        <div className="flex gap-4 items-center flex-wrap">
+          <div className="flex items-center gap-2"><span className="text-[10px] font-black text-slate-400 uppercase">Pub</span>
+            <select value={pubId} onChange={e => setPubId(e.target.value)} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold outline-none">
+              {pubOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black text-slate-400 uppercase">日期</span>
+            <select value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-slate-50 border rounded-lg px-2 py-1.5 text-xs font-bold outline-none">
+              {availableDates.map(d => <option key={d} value={d}>{d.slice(4,6)}月{d.slice(6,8)}日</option>)}
+            </select>
+            <span className="text-slate-400">→</span>
+            <select value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-slate-50 border rounded-lg px-2 py-1.5 text-xs font-bold outline-none">
+              {availableDates.map(d => <option key={d} value={d}>{d.slice(4,6)}月{d.slice(6,8)}日</option>)}
+            </select>
+            <button onClick={()=>{setDateFrom(dayOffset(3));setDateTo(dayOffset(1));}} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">近3天</button>
+            <button onClick={()=>{setDateFrom(dayOffset(7));setDateTo(dayOffset(1));}} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">近7天</button>
+            <button onClick={()=>{setDateFrom(dayOffset(14));setDateTo(dayOffset(1));}} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">近14天</button>
+            <span className="w-px h-4 bg-slate-200 mx-1"></span>
+            <div className="flex bg-slate-200 p-0.5 rounded-lg">
+              {[{k:'ecpc',l:'eCPC↓'},{k:'feed',l:'Feed顺序'}].map(m => (
+                <button key={m.k} onClick={() => setSortMethod(m.k)} className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${sortMethod === m.k ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>{m.l}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] text-slate-500">
+          <span className="font-bold">筛选: </span>
+          <span>Rev≥</span><input type="number" step="any" value={minRev} onChange={e => setMinRev(Number(e.target.value))} className="w-16 bg-slate-50 border rounded px-1.5 py-0.5 text-xs font-bold outline-none"/>
+          <span>eCPC≥</span><input type="number" step="any" value={minEcpc} onChange={e => setMinEcpc(Number(e.target.value))} className="w-16 bg-slate-50 border rounded px-1.5 py-0.5 text-xs font-bold outline-none"/>
+          <span>CVR≥</span><input type="number" step="any" value={minCvr} onChange={e => setMinCvr(Number(e.target.value))} className="w-16 bg-slate-50 border rounded px-1.5 py-0.5 text-xs font-bold outline-none"/><span>%</span>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] text-slate-500">
+          <span className="font-bold">快照: </span>
+          {snapshot ? (
+            snapshot.error ? (
+              <span className="text-rose-600">错误: {snapshot.error}</span>
+            ) : (
+              <span className="text-slate-600">{snapshot.timestamp} · {snapshot.count?.toLocaleString()} offers</span>
+            )
+          ) : <span className="text-slate-400">检查中...</span>}
+          <button onClick={updateSnapshot} className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-[10px] font-bold hover:bg-amber-100">更新Feed</button>
+          {snapshot?.error && <button onClick={() => { setTokenInput(''); setTokenModal(true); }} className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded text-[10px] font-bold hover:bg-rose-100">重输Token</button>}
+        </div>
+        <textarea value={pairs} onChange={e => setPairs(e.target.value)} placeholder="每行 包名\tGEO&#10;例：com.globe.gcash.android	PH"
+          className="w-full h-32 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-mono outline-none focus:ring-2 focus:ring-purple-500/20 resize-y"/>
+        <div className="flex gap-3 items-center">
+          <button onClick={doMatch} disabled={loading} className={`px-4 py-2 rounded-xl text-xs font-bold ${loading ? 'bg-slate-100 text-slate-400' : 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm'}`}>{loading ? '匹配中...' : '开始匹配'}</button>
+          {result && !result.error && <>
+            <button onClick={()=>downloadExcel(false)} className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">下载Excel(全量)</button>
+            <button onClick={()=>downloadExcel(true)} className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm">下载Excel(已选)</button>
+          </>}
+        </div>
+        {result && !result.error && result.stats && (
+          <>
+            <div className="flex items-center gap-4 flex-wrap bg-slate-50 rounded-xl p-3">
+              <span className="text-xs font-bold text-slate-500">统计:</span>
+              <span className="text-xs font-bold" style={{color:'#006100'}}>🟢 {result.stats.green}</span>
+              <span className="text-xs font-bold" style={{color:'#9C6500'}}>🟡 {result.stats.yellow}</span>
+              <span className="text-xs font-bold" style={{color:'#9C0006'}}>🔴 {result.stats.red}</span>
+              <span className="text-xs text-slate-400">| 已选 <b className="text-slate-700">{selectedIds.size}</b> ID</span>
+              <div className="flex gap-2 ml-auto">
+                <button onClick={toggleAll} className="px-3 py-1 rounded-lg text-[10px] font-bold bg-slate-200 text-slate-600 hover:bg-slate-300">{selectedIds.size > 0 ? '☐ 清空' : '☑ 全选'}</button>
+                <div className="flex bg-slate-200 p-0.5 rounded-lg">
+                  {['|',','].map(s => <button key={s} onClick={() => setSepMode(s)} className={`px-2 py-0.5 rounded text-[10px] font-bold ${sepMode === s ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600'}`}>{s === '|' ? 'pipe' : '逗号'}</button>)}
+                </div>
+                <button onClick={copyIds} className="px-3 py-1 rounded-lg text-[10px] font-bold bg-slate-700 text-white hover:bg-slate-800">复制ID</button>
+                <button onClick={copyFmt} className="px-3 py-1 rounded-lg text-[10px] font-bold bg-blue-600 text-white hover:bg-blue-700">复制格式</button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead><tr className="bg-slate-100 text-[10px] font-black text-slate-500 uppercase"><th className="px-3 py-2">包名</th><th className="px-3 py-2">GEO</th><th className="px-3 py-2">状态</th><th className="px-3 py-2">☑</th><th className="px-3 py-2">Offer ID</th><th className="px-3 py-2">Rev</th><th className="px-3 py-2">Click</th><th className="px-3 py-2">eCPC</th><th className="px-3 py-2">CVR</th></tr></thead>
+                <tbody>
+                  {result.matches.map((m, mi) => {
+                    const fill = m.status === 'green' ? '#C6EFCE' : m.status === 'yellow' ? '#FFEB9C' : '#FFC7CE';
+                    if (m.status === 'green' && m.offers.length > 0) {
+                      return m.offers.map((o, oi) => (
+                        <tr key={`${mi}-${oi}`} style={{backgroundColor: fill, borderBottom: oi === m.offers.length - 1 ? '2px solid #94a3b8' : undefined}}>
+                          {oi === 0 && <td rowSpan={m.offers.length} className="px-3 py-2 font-bold text-xs">{m.pkg}</td>}
+                          {oi === 0 && <td rowSpan={m.offers.length} className="px-3 py-2 font-bold text-xs text-center">{m.geo}</td>}
+                          {oi === 0 && <td rowSpan={m.offers.length} className="px-3 py-2 text-center">{m.status === 'green' ? '🟢' : '🟡'}</td>}
+                          <td className="px-3 py-2 text-center"><input type="checkbox" checked={selectedIds.has(o.id)} onChange={e => handleCheck(o.id, e.target.checked)}/></td>
+                          <td className="px-3 py-2 font-bold text-xs">{o.id}<span className="text-slate-400 font-normal">({o.adv})</span></td>
+                          <td className="px-3 py-2 text-xs font-mono">${o.rev}</td>
+                          <td className="px-3 py-2 text-xs font-mono">{o.click}</td>
+                          <td className="px-3 py-2 text-xs font-mono text-rose-600">${o.ecpc}</td>
+                          <td className="px-3 py-2 text-xs font-mono text-emerald-600">{o.cvr}%</td>
+                        </tr>
+                      ));
+                    }
+                    return (
+                      <tr key={mi} style={{backgroundColor: fill, borderBottom: '2px solid #94a3b8'}}>
+                        <td className="px-3 py-2 font-bold text-xs">{m.pkg}</td><td className="px-3 py-2 font-bold text-xs text-center">{m.geo}</td>
+                        <td className="px-3 py-2 text-center">{m.status === 'green' ? '🟢' : m.status === 'yellow' ? '🟡' : '🔴'}</td>
+                        <td className="px-3 py-2 text-center">{m.other_offers.length > 0 ? <input type="checkbox" checked={selectedYellow.has(mi)} onChange={e => { setSelectedYellow(prev => { const next = new Set(prev); e.target.checked ? next.add(mi) : next.delete(mi); return next; }); }}/> : null}</td>
+                        <td className="px-3 py-2 font-bold text-xs">{m.status === 'red' ? '无匹配' : '—'}</td>
+                        <td className="px-3 py-2 text-xs text-slate-400" colSpan={4}>{m.other_offers.length > 0 ? '其他国家: ' + m.other_offers.join(', ') : ''}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+        {result && result.error && <div className="text-rose-600 font-bold text-sm">{result.error}</div>}
+        {tokenModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md flex flex-col gap-4">
+              <h3 className="font-black text-slate-800 text-lg">{getPubLabel(pubId)} 未配置 Token</h3>
+              <input value={tokenInput} onChange={e => setTokenInput(e.target.value)} placeholder="请输入 Feed API Token" className="bg-slate-50 border rounded-xl px-4 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-purple-500/20"/>
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setTokenModal(false)} className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600">取消</button>
+                <button onClick={saveToken} disabled={!tokenInput} className={`px-4 py-2 rounded-xl text-xs font-bold ${tokenInput ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-slate-100 text-slate-400'}`}>保存并重试</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const RankingView = ({ data, onCopy }) => {
   const topOffers = useMemo(() => {
     const grouped = data.reduce((acc, d) => { const k = d.Offer || 'Unknown'; acc[k] = (acc[k] || 0) + (Number(d.Revenue) || 0); return acc; }, {});
@@ -1351,7 +1561,7 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
       localStats[pubId][oid].cbconv += (Number(d['Callback Conversion']) || 0);
     });
     return pubs.map(pub => {
-      const isSameAdv = (pS, aS) => { const cP = pS.replace(/^\d+-/, '').toLowerCase().trim(), cA = aS.replace(/^\d+-/, '').toLowerCase().trim(); return cP === cA || (cP.length > 2 && cA.length > 2 && (cP.includes(cA) || cA.includes(cP))); };
+      const isSameAdv = (pubId, advId) => { const pi = pubNameMap[pubId]; const pn = (typeof pi === 'string' ? pi : pi?.name || '').toLowerCase().trim(); const an = (advNameMap[advId] || '').toLowerCase().trim(); if (!pn || !an) return false; return pn === an || (pn.length > 2 && an.length > 2 && (pn.includes(an) || an.includes(pn))); };
       const blueOcean = Object.values(globalStats).map(o => ({...o, cvr: o.totalClick > 0 ? (o.totalConv / o.totalClick) * 100 : 0, ecpc: o.totalClick > 0 ? (o.totalPayout / o.totalClick) * 1000 : 0})).filter(o => !o.byPub[pub] && !isSameAdv(pub, o.advertiserId) && (o.totalRev >= filters.minRevenue) && (o.totalConv >= filters.minConv) && (o.ecpc >= filters.minEcpcBlue) && (o.cvr >= filters.minCvrBlue)).sort((a,b)=>b.totalRev-a.totalRev);
       const pubOffers = Object.values(localStats[pub]).map(o => ({...o, ecpc: o.click > 0 ? ((o.payout/o.click)*1000) : 0, cvr: o.click > 0 ? ((o.cbconv/o.click)*100) : 0})).filter(o => o.payout >= filters.minPayout && o.ecpc >= filters.minEcpc && o.cvr >= filters.minCvr && o.click >= filters.minClickEcpc);
       return { pub, blueOcean, topEcpc: [...pubOffers].sort((a,b)=>b.ecpc-a.ecpc).slice(0, 20), topCvr: [...pubOffers].sort((a,b)=>b.cvr-a.cvr).slice(0, 20) };
@@ -1399,7 +1609,7 @@ const ExpansionView = ({ data, filters, setFilters, onCopy }) => {
                     ))}
                   </div>
                 </div>
-                <div className="flex gap-2"><button onClick={() => copyIds([...res.blueOcean].sort((a,b)=>sortMode==='ecpc'?b.ecpc-a.ecpc:sortMode==='cvr'?b.cvr-a.cvr:b.totalRev-a.totalRev))} className="bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-slate-50">复制 ID</button><button onClick={() => copyFormatted([...res.blueOcean].sort((a,b)=>sortMode==='ecpc'?b.ecpc-a.ecpc:sortMode==='cvr'?b.cvr-a.cvr:b.totalRev-a.totalRev))} className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200">复制格式</button></div>
+                <div className="flex gap-2"><button onClick={() => copyIds([...res.blueOcean].sort((a,b)=>sortMode==='ecpc'?b.ecpc-a.ecpc:sortMode==='cvr'?b.cvr-a.cvr:b.totalRev-a.totalRev))} className="bg-white border border-slate-200 text-slate-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-slate-50">复制 ID</button><button onClick={() => copyFormatted([...res.blueOcean].sort((a,b)=>sortMode==='ecpc'?b.ecpc-a.ecpc:sortMode==='cvr'?b.cvr-a.cvr:b.totalRev-a.totalRev), sortMode==='ecpc'?'ecpc':sortMode==='cvr'?'cvr':undefined)} className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-200">复制格式</button></div>
               </div>
               <div className="flex flex-wrap gap-2">
                 {sorted.slice(0, 12).map((o, i) => (<div key={i} className="bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-2"><span>{o.id}</span><span className="text-slate-300">|</span><span className={sortMode === 'ecpc' ? 'text-rose-600' : sortMode === 'cvr' ? 'text-emerald-600' : 'text-emerald-600'}>${sortMode === 'ecpc' ? o.ecpc.toFixed(2) : sortMode === 'cvr' ? o.cvr.toFixed(2) + '%' : o.totalRev.toFixed(0)}</span></div>))}
@@ -1484,7 +1694,7 @@ function App() {
     loadData(from, to);
   };
 
-  const tabLabel = { dashboard: "总览看板", trend: "趋势分析", packageScout: "包名透视", anomaly: "异常监控", capWarning: "Cap预警", exclusion: "每日剔除", expansion: "拓量蓝海", advtop: "adv-top", joiner: "拼接id", ranking: "绩效排行" };
+  const tabLabel = { dashboard: "总览看板", trend: "趋势分析", packageScout: "包名透视", anomaly: "异常监控", capWarning: "Cap预警", exclusion: "每日剔除", expansion: "拓量蓝海", advtop: "adv-top", joiner: "拼接id", matcher: "offer匹配", ranking: "绩效排行" };
 
   return (
     <div className="flex h-screen bg-[#F8FAFC] text-slate-700 overflow-hidden font-sans">
@@ -1501,6 +1711,7 @@ function App() {
           <NavItem iconName="Compass" label="拓量蓝海" active={activeTab==='expansion'} onClick={()=>setActiveTab('expansion')}/>
           <NavItem iconName="Zap" label="adv-top" active={activeTab==='advtop'} onClick={()=>setActiveTab('advtop')}/>
           <NavItem iconName="Copy" label="拼接id" active={activeTab==='joiner'} onClick={()=>setActiveTab('joiner')}/>
+          <NavItem iconName="Search" label="offer匹配" active={activeTab==='matcher'} onClick={()=>setActiveTab('matcher')}/>
           <NavItem iconName="Award" label="绩效排行" active={activeTab==='ranking'} onClick={()=>setActiveTab('ranking')}/>
         </nav>
         {lastRefresh && <div className="px-4 py-3 border-t text-[10px] text-slate-400 font-bold space-y-1"><div className="flex items-center gap-1.5"><I name="CheckCircle2" size={12} color="#10b981"/> 刷新: {lastRefresh.toLocaleTimeString()}</div>{latestData.latest_date && <div className="flex items-center gap-1.5"><I name="Calendar" size={12} color="#3b82f6"/> 数据至: {latestData.latest_date.slice(4,6)}月{latestData.latest_date.slice(6,8)}日 {latestData.latest_created ? latestData.latest_created.slice(11,19) : ''}</div>}</div>}
@@ -1509,7 +1720,7 @@ function App() {
         <header className="h-16 px-8 flex items-center bg-white border-b shrink-0 justify-between">
           <h2 className="font-bold text-slate-800 text-lg uppercase tracking-widest">{tabLabel[activeTab]}</h2>
         </header>
-        {activeTab !== 'joiner' && (<>
+        {activeTab !== 'joiner' && activeTab !== 'matcher' && (<>
         <div className="px-8 pt-4 shrink-0">
           <DateRangePicker dateFrom={dateFrom} dateTo={dateTo} onApply={handleDateApply} onRefresh={() => loadData()} loading={loading}/>
           {error && <div className="mt-2 text-rose-500 text-sm font-bold">{error}</div>}
@@ -1540,6 +1751,7 @@ function App() {
               {activeTab === 'expansion' && <ExpansionView data={rawData} filters={filters} setFilters={setFilters} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
               {activeTab === 'advtop' && <AdvTopView data={rawData} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
               {activeTab === 'joiner' && <IdJoinerView />}
+              {activeTab === 'matcher' && <OfferMatchView />}
               {activeTab === 'ranking' && <RankingView data={rawData} onCopy={t => {copyToClipboard(t); showToast("IDs 已复制");}} />}
             </>
           )}
