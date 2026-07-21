@@ -48,6 +48,18 @@ ADV_NAME = os.environ.get('ADV_NAME', 'Appnext-Click')
 REJECT_RATE_THRESHOLD = float(os.environ.get('REJECT_RATE_THRESHOLD', '0.05'))
 MAX_RETRIES = 3
 
+
+def load_advs():
+    advs = []
+    advs.append((ADV_ID, ADV_NAME))
+    i = 2
+    while f'ADV_ID_{i}' in os.environ:
+        adv_id = os.environ[f'ADV_ID_{i}']
+        adv_name = os.environ.get(f'ADV_NAME_{i}', adv_id)
+        advs.append((adv_id, adv_name))
+        i += 1
+    return advs
+
 COLS = [
     ("Offer ID", 10, 'L'),
     ("包名", 22, 'L'),
@@ -123,7 +135,7 @@ def send_feishu_card(card):
     return results
 
 
-def fetch_reject_records(dates):
+def fetch_reject_records(dates, adv_id):
     conn = pymysql.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
@@ -141,7 +153,7 @@ def fetch_reject_records(dates):
         FROM offerplus_detail_report
         WHERE src = %s AND date IN ({placeholders}) AND reject > 0
         '''
-        cursor.execute(sql, [ADV_ID] + past_dates)
+        cursor.execute(sql, [adv_id] + past_dates)
         all_rows.extend(cursor.fetchall())
 
     if today_str in dates:
@@ -150,7 +162,7 @@ def fetch_reject_records(dates):
         FROM offerplus_detail_report_snapshot_8
         WHERE src = %s AND date = %s AND reject > 0
         '''
-        cursor.execute(sql, [ADV_ID, today_str])
+        cursor.execute(sql, [adv_id, today_str])
         all_rows.extend(cursor.fetchall())
 
     pub_mapping = load_pub_mapping()
@@ -217,7 +229,7 @@ def _build_table(day_records):
     return '\n'.join(lines)
 
 
-def build_card(dates, records):
+def build_card(dates, records, adv_id, adv_name):
     beijing = timezone(timedelta(hours=8))
     now_beijing = datetime.now(beijing)
     threshold_pct = int(REJECT_RATE_THRESHOLD * 100)
@@ -244,7 +256,7 @@ def build_card(dates, records):
             f"{d[4:6]}-{d[6:]}: {date_counts[d]}条"
             for d in dates if date_counts.get(d, 0) > 0
         )
-        md_lines.append(f"📡 来源：{ADV_NAME}（{ADV_ID}）")
+        md_lines.append(f"📡 来源：{adv_name}（{adv_id}）")
         md_lines.append(f"⚠️ 共发现 {total_records} 条异常记录（{count_parts}）")
         md_lines.append("")
 
@@ -275,7 +287,7 @@ def build_card(dates, records):
         "header": {
             "title": {
                 "tag": "plain_text",
-                "content": f"{date_range} Reject拒绝率预警（reject_rate > {threshold_pct}%）"
+                "content": f"{date_range} {adv_name} Reject拒绝率预警（reject_rate > {threshold_pct}%）"
             },
             "template": "red"
         },
@@ -313,31 +325,29 @@ def main():
     args = parser.parse_args()
 
     dates = get_dates(args.dates)
+    advs = load_advs()
 
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            records, _unknown_mids = fetch_reject_records(dates)
-            card = build_card(dates, records)
-            print(json.dumps(card, ensure_ascii=False, indent=2))
-            result = send_feishu_card(card)
-            print(f"Sent successfully: {result}")
-            return
-
-        except Exception as e:
-            error_detail = traceback.format_exc()
-            print(f"Attempt {attempt}/{MAX_RETRIES} failed: {e}", file=sys.stderr)
-
-            if attempt < MAX_RETRIES:
-                continue
-
-            error_msg = (
-                f"日期: {dates}\n"
-                f"重试次数: {MAX_RETRIES}\n"
-                f"错误信息: {str(e)}\n\n"
-                f"详细堆栈:\n{error_detail}"
-            )
-            send_error_alert(error_msg)
-            sys.exit(1)
+    for adv_id, adv_name in advs:
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                records, _unknown_mids = fetch_reject_records(dates, adv_id)
+                card = build_card(dates, records, adv_id, adv_name)
+                print(json.dumps(card, ensure_ascii=False, indent=2))
+                result = send_feishu_card(card)
+                print(f"[{adv_name}] Sent successfully: {result}")
+                break
+            except Exception as e:
+                error_detail = traceback.format_exc()
+                print(f"[{adv_name}] Attempt {attempt}/{MAX_RETRIES} failed: {e}", file=sys.stderr)
+                if attempt >= MAX_RETRIES:
+                    error_msg = (
+                        f"广告主: {adv_name} ({adv_id})\n"
+                        f"日期: {dates}\n"
+                        f"重试次数: {MAX_RETRIES}\n"
+                        f"错误信息: {str(e)}\n\n"
+                        f"详细堆栈:\n{error_detail}"
+                    )
+                    send_error_alert(error_msg)
 
 
 if __name__ == '__main__':
