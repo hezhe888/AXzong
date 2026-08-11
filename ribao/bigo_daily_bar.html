@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BIGO 投放柱状图</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #617080;
+      --grid: #dde5ec;
+      --blue: #2f6fed;
+      --green: #10a37f;
+      --amber: #f2a900;
+      --bg: #ffffff;
+      --panel: #f5f7fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--panel);
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+    }
+    .wrap {
+      width: min(1680px, calc(100vw - 32px));
+      margin: 24px auto;
+      background: var(--bg);
+      border: 1px solid #e5ebf2;
+      border-radius: 8px;
+      padding: 28px 30px 26px;
+      box-shadow: 0 10px 30px rgba(23, 33, 43, 0.07);
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 16px;
+      margin-top: 6px;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(132px, 1fr));
+      gap: 12px;
+      min-width: 470px;
+    }
+    .kpi {
+      border: 1px solid #e3eaf1;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fbfcfe;
+    }
+    .kpi .label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .kpi .value {
+      font-size: 21px;
+      font-weight: 700;
+      margin-top: 4px;
+      white-space: nowrap;
+    }
+    .chart-card {
+      position: relative;
+      border: 1px solid #e3eaf1;
+      border-radius: 8px;
+      background: #fff;
+      padding: 16px 16px 10px;
+    }
+    svg {
+      width: 100%;
+      height: 760px;
+      display: block;
+    }
+    .hover {
+      cursor: crosshair;
+    }
+    .tooltip {
+      position: absolute;
+      display: none;
+      pointer-events: none;
+      min-width: 210px;
+      padding: 11px 13px;
+      border: 1px solid #d8e1eb;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 8px 24px rgba(23, 33, 43, 0.16);
+      font-size: 14px;
+      line-height: 1.55;
+      z-index: 5;
+    }
+    .tooltip .date {
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .legend {
+      display: flex;
+      gap: 22px;
+      margin: 12px 0 0 90px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .swatch {
+      width: 28px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    @media (max-width: 980px) {
+      header { display: block; }
+      .kpis { min-width: 0; margin-top: 16px; }
+      svg { height: 680px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div>
+        <h1>BIGO 投放柱状图</h1>
+        <div class="sub">每日 bigo 花费与 Revenue 并列柱状图，ROI 单独放在下方趋势区；悬停查看当天明细。</div>
+      </div>
+      <section class="kpis">
+        <div class="kpi"><div class="label">总花费</div><div id="totalSpend" class="value"></div></div>
+        <div class="kpi"><div class="label">总 Revenue</div><div id="totalRevenue" class="value"></div></div>
+        <div class="kpi"><div class="label">总 ROI</div><div id="totalRoi" class="value"></div></div>
+      </section>
+    </header>
+    <section id="chartCard" class="chart-card">
+      <svg id="chart" role="img" aria-label="BIGO 投放柱状图与 ROI 趋势"></svg>
+      <div id="tooltip" class="tooltip"></div>
+      <div class="legend">
+        <span><i class="swatch" style="background: var(--blue)"></i>bigo 花费</span>
+        <span><i class="swatch" style="background: var(--green)"></i>Revenue</span>
+        <span><i class="swatch" style="background: var(--amber)"></i>ROI</span>
+      </div>
+    </section>
+  </main>
+  <script>
+    const data = [
+      {"date":"2026-06-17","label":"6/17","spend":31.83,"revenue":33.01,"roi":1.0371},
+      {"date":"2026-06-18","label":"6/18","spend":64.56,"revenue":68.10,"roi":1.0548},
+      {"date":"2026-06-19","label":"6/19","spend":78.00,"revenue":78.27,"roi":1.0035},
+      {"date":"2026-06-20","label":"6/20","spend":77.55,"revenue":79.67,"roi":1.0273},
+      {"date":"2026-06-21","label":"6/21","spend":54.82,"revenue":65.40,"roi":1.1930},
+      {"date":"2026-06-22","label":"6/22","spend":43.21,"revenue":65.91,"roi":1.5253},
+      {"date":"2026-06-23","label":"6/23","spend":48.97,"revenue":57.47,"roi":1.1736},
+      {"date":"2026-06-24","label":"6/24","spend":88.29,"revenue":122.83,"roi":1.3912},
+      {"date":"2026-06-25","label":"6/25","spend":98.48,"revenue":153.23,"roi":1.5560},
+      {"date":"2026-06-26","label":"6/26","spend":132.87,"revenue":189.84,"roi":1.4288},
+      {"date":"2026-06-27","label":"6/27","spend":165.23,"revenue":234.89,"roi":1.4216},
+      {"date":"2026-06-28","label":"6/28","spend":161.23,"revenue":245.07,"roi":1.5200},
+      {"date":"2026-06-29","label":"6/29","spend":168.93,"revenue":324.21,"roi":1.9192},
+      {"date":"2026-06-30","label":"6/30","spend":261.20,"revenue":432.64,"roi":1.6564},
+      {"date":"2026-07-01","label":"7/1","spend":181.29,"revenue":224.32,"roi":1.2374},
+      {"date":"2026-07-02","label":"7/2","spend":183.72,"revenue":136.57,"roi":0.7434},
+      {"date":"2026-07-03","label":"7/3","spend":27.50,"revenue":34.83,"roi":1.2665},
+      {"date":"2026-07-04","label":"7/4","spend":70.23,"revenue":125.20,"roi":1.7827},
+      {"date":"2026-07-05","label":"7/5","spend":103.87,"revenue":137.41,"roi":1.3229},
+      {"date":"2026-07-06","label":"7/6","spend":70.38,"revenue":109.79,"roi":1.5600},
+      {"date":"2026-07-07","label":"7/7","spend":53.04,"revenue":50.41,"roi":0.9504},
+      {"date":"2026-07-08","label":"7/8","spend":83.23,"revenue":60.59,"roi":0.7280},
+      {"date":"2026-07-09","label":"7/9","spend":64.48,"revenue":75.97,"roi":1.1782},
+      {"date":"2026-07-10","label":"7/10","spend":31.57,"revenue":49.60,"roi":1.5711},
+      {"date":"2026-07-11","label":"7/11","spend":44.64,"revenue":57.90,"roi":1.2970},
+      {"date":"2026-07-12","label":"7/12","spend":41.24,"revenue":67.72,"roi":1.6421},
+      {"date":"2026-07-13","label":"7/13","spend":70.63,"revenue":75.40,"roi":1.0675},
+      {"date":"2026-07-14","label":"7/14","spend":46.83,"revenue":60.49,"roi":1.2917},
+      {"date":"2026-07-15","label":"7/15","spend":41.99,"revenue":69.42,"roi":1.6533},
+      {"date":"2026-07-16","label":"7/16","spend":49.21,"revenue":72.74,"roi":1.4782},
+      {"date":"2026-07-17","label":"7/17","spend":50.67,"revenue":69.55,"roi":1.3726},
+      {"date":"2026-07-18","label":"7/18","spend":53.16,"revenue":90.80,"roi":1.7081},
+      {"date":"2026-07-19","label":"7/19","spend":146.05,"revenue":153.11,"roi":1.0483},
+      {"date":"2026-07-20","label":"7/20","spend":97.48,"revenue":132.57,"roi":1.3600},
+      {"date":"2026-07-21","label":"7/21","spend":168.94,"revenue":209.65,"roi":1.2410},
+      {"date":"2026-07-22","label":"7/22","spend":145.93,"revenue":191.13,"roi":1.3097},
+      {"date":"2026-07-23","label":"7/23","spend":202.38,"revenue":363.41,"roi":1.7957},
+      {"date":"2026-07-24","label":"7/24","spend":175.77,"revenue":239.18,"roi":1.3608},
+      {"date":"2026-07-25","label":"7/25","spend":165.67,"revenue":248.21,"roi":1.4982},
+      {"date":"2026-07-26","label":"7/26","spend":184.98,"revenue":224.81,"roi":1.2153},
+      {"date":"2026-07-27","label":"7/27","spend":167.62,"revenue":194.43,"roi":1.1599}
+    ];
+    const totals = {"spend": 4156.43, "revenue": 5675.75, "roi": 1.3655};
+    const svg = document.getElementById("chart");
+    const card = document.getElementById("chartCard");
+    const tooltip = document.getElementById("tooltip");
+    const colors = {
+      ink: "#17212b",
+      muted: "#617080",
+      grid: "#dde5ec",
+      blue: "#2f6fed",
+      green: "#10a37f",
+      amber: "#f2a900"
+    };
+    function money(value) {
+      return Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function shortMoney(value) {
+      return Number(value).toLocaleString("en-US", { maximumFractionDigits: 0 });
+    }
+    function pct(value) {
+      return `${(Number(value) * 100).toFixed(1)}%`;
+    }
+    function create(tag, attrs = {}, parent = svg) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
+      parent.appendChild(el);
+      return el;
+    }
+    function showTip(event, item) {
+      tooltip.style.display = "block";
+      tooltip.innerHTML = `
+        <div class="date">${item.date}</div>
+        <div style="color:${colors.blue};font-weight:700">bigo 花费：${money(item.spend)}</div>
+        <div style="color:${colors.green};font-weight:700">Revenue：${money(item.revenue)}</div>
+        <div style="color:${colors.amber};font-weight:700">Revenue ROI：${pct(item.roi)}</div>
+      `;
+      moveTip(event);
+    }
+    function moveTip(event) {
+      const bounds = card.getBoundingClientRect();
+      const tipW = tooltip.offsetWidth;
+      const tipH = tooltip.offsetHeight;
+      let left = event.clientX - bounds.left + 16;
+      let top = event.clientY - bounds.top - tipH - 14;
+      if (left + tipW > bounds.width) left = event.clientX - bounds.left - tipW - 16;
+      if (top < 0) top = event.clientY - bounds.top + 18;
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+    }
+    function hideTip() {
+      tooltip.style.display = "none";
+    }
+    function linePath(points) {
+      return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+    }
+    function render() {
+      document.getElementById("totalSpend").textContent = money(totals.spend);
+      document.getElementById("totalRevenue").textContent = money(totals.revenue);
+      document.getElementById("totalRoi").textContent = pct(totals.roi);
+      svg.innerHTML = "";
+
+      const width = 2400;
+      const height = 760;
+      const left = 76;
+      const right = 84;
+      const top = 24;
+      const barPlotH = 450;
+      const gap = 40;
+      const roiTop = top + barPlotH + gap;
+      const roiPlotH = 190;
+      const bottom = 56;
+      const plotW = width - left - right;
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+      const maxValue = Math.ceil(Math.max(...data.flatMap(d => [d.spend, d.revenue])) / 50) * 50;
+      const maxRoi = Math.max(2, Math.ceil(Math.max(...data.map(d => d.roi)) * 10) / 10);
+      const groupW = plotW / data.length;
+      const barW = Math.max(6, groupW * 0.32);
+      const y = value => top + barPlotH - value / maxValue * barPlotH;
+      const yRoi = value => roiTop + roiPlotH - value / maxRoi * roiPlotH;
+
+      for (let i = 0; i <= 5; i++) {
+        const value = maxValue * i / 5;
+        const yy = y(value);
+        create("line", { x1: left, y1: yy, x2: width - right, y2: yy, stroke: colors.grid, "stroke-width": 1 });
+        create("text", { x: left - 12, y: yy + 5, "text-anchor": "end", fill: colors.muted, "font-size": 13 }).textContent = shortMoney(value);
+      }
+      create("text", { x: left, y: top - 14, fill: colors.muted, "font-size": 14, "font-weight": 700 }).textContent = "花费 / Revenue";
+
+      for (let i = 0; i <= 4; i++) {
+        const value = maxRoi * i / 4;
+        const yy = yRoi(value);
+        create("line", { x1: left, y1: yy, x2: width - right, y2: yy, stroke: colors.grid, "stroke-width": 1 });
+        create("text", { x: left - 12, y: yy + 5, "text-anchor": "end", fill: colors.muted, "font-size": 12 }).textContent = pct(value);
+      }
+      create("text", { x: left, y: roiTop - 16, fill: colors.amber, "font-size": 14, "font-weight": 700 }).textContent = "Revenue ROI";
+
+      const roiPoints = [];
+      data.forEach((item, index) => {
+        const cx = left + index * groupW + groupW / 2;
+        const spendH = barPlotH - (y(item.spend) - top);
+        const revenueH = barPlotH - (y(item.revenue) - top);
+        create("rect", { x: cx - barW - 2, y: y(item.spend), width: barW, height: spendH, rx: 4, fill: colors.blue });
+        create("rect", { x: cx + 2, y: y(item.revenue), width: barW, height: revenueH, rx: 4, fill: colors.green });
+        const point = { x: cx, y: yRoi(item.roi), item };
+        roiPoints.push(point);
+        if (index % 5 === 0 || index === data.length - 1) {
+          create("text", { x: cx, y: height - 34, "text-anchor": "middle", fill: colors.ink, "font-size": 13 }).textContent = item.label;
+        }
+        const hit = create("rect", { x: cx - groupW / 2, y: top, width: groupW, height: roiTop + roiPlotH - top, fill: "transparent", class: "hover" });
+        hit.addEventListener("mouseenter", event => showTip(event, item));
+        hit.addEventListener("mousemove", event => moveTip(event));
+        hit.addEventListener("mouseleave", hideTip);
+      });
+
+      create("path", { d: linePath(roiPoints), fill: "none", stroke: colors.amber, "stroke-width": 3, "stroke-linejoin": "round" });
+      roiPoints.forEach(p => create("circle", { cx: p.x, cy: p.y, r: 4, fill: colors.amber, stroke: "#fff", "stroke-width": 2 }));
+      create("text", { x: left + plotW / 2, y: height - 8, "text-anchor": "middle", fill: colors.muted, "font-size": 14 }).textContent = "日期";
+      create("text", { x: 18, y: top + barPlotH / 2, fill: colors.muted, "font-size": 14 }).textContent = "金额";
+    }
+    render();
+  </script>
+</body>
+</html>

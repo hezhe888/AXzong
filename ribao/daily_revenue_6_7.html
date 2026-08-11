@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>日维度 Revenue & 毛利（6-7月）</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #617080;
+      --grid: #dde5ec;
+      --axis: #7d8a96;
+      --blue: #2f6fed;
+      --green: #10a37f;
+      --amber: #f2a900;
+      --profit: #d14c32;
+      --bg: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f5f7fa;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+    }
+    .wrap {
+      width: min(1800px, calc(100vw - 32px));
+      margin: 24px auto;
+      background: var(--bg);
+      border: 1px solid #e5ebf2;
+      border-radius: 8px;
+      padding: 28px 30px 22px;
+      box-shadow: 0 10px 30px rgba(23, 33, 43, 0.07);
+    }
+    .head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 8px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+    .sub {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+    .legend {
+      display: flex;
+      gap: 22px;
+      align-items: center;
+      margin-top: 10px;
+      font-size: 15px;
+      white-space: nowrap;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .swatch {
+      width: 28px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    .chart-box {
+      position: relative;
+      width: 100%;
+      height: min(760px, calc(100vh - 190px));
+      min-height: 560px;
+    }
+    svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      overflow: visible;
+    }
+    .tooltip {
+      position: absolute;
+      pointer-events: none;
+      display: none;
+      min-width: 190px;
+      padding: 10px 12px;
+      border: 1px solid #d8e1eb;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 8px 24px rgba(23, 33, 43, 0.16);
+      font-size: 14px;
+      line-height: 1.55;
+      z-index: 5;
+    }
+    .tooltip .date { font-weight: 700; margin-bottom: 4px; }
+    .tooltip .rev { color: var(--blue); font-weight: 700; }
+    .tooltip .profit { color: var(--profit); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="head">
+      <div>
+        <h1>日维度 Revenue & 毛利（6-7月）</h1>
+        <div class="sub">6月1日-7月27日明细；鼠标悬停任意日期查看 Revenue、Margin%、毛利；虚线分隔 6/7月</div>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background: var(--blue)"></i>Revenue</span>
+        <span><i class="swatch" style="background: var(--profit)"></i>毛利</span>
+        <span><i class="swatch" style="background: var(--amber)"></i>突破节点</span>
+      </div>
+    </div>
+    <div id="chartBox" class="chart-box">
+      <svg id="chart" role="img" aria-label="日维度 Revenue 与毛利交互图"></svg>
+      <div id="tooltip" class="tooltip"></div>
+    </div>
+  </main>
+  <script>
+    const data = [
+{"date":"2026-06-01","label":"6/1","revenue":2309.43,"margin":26.178,"profit":604.56},
+{"date":"2026-06-02","label":"6/2","revenue":2638.75,"margin":27.369,"profit":722.20},
+{"date":"2026-06-03","label":"6/3","revenue":2881.41,"margin":29.537,"profit":851.08},
+{"date":"2026-06-04","label":"6/4","revenue":2469.81,"margin":28.297,"profit":698.89},
+{"date":"2026-06-05","label":"6/5","revenue":2528.57,"margin":27.283,"profit":689.86},
+{"date":"2026-06-06","label":"6/6","revenue":2813.11,"margin":33.120,"profit":931.70},
+{"date":"2026-06-07","label":"6/7","revenue":2854.05,"margin":29.431,"profit":839.98},
+{"date":"2026-06-08","label":"6/8","revenue":2674.77,"margin":30.458,"profit":814.69},
+{"date":"2026-06-09","label":"6/9","revenue":2694.52,"margin":30.171,"profit":812.95},
+{"date":"2026-06-10","label":"6/10","revenue":2048.15,"margin":27.494,"profit":563.12},
+{"date":"2026-06-11","label":"6/11","revenue":2960.99,"margin":33.998,"profit":1006.67},
+{"date":"2026-06-12","label":"6/12","revenue":2858.03,"margin":29.495,"profit":842.97},
+{"date":"2026-06-13","label":"6/13","revenue":3028.23,"margin":30.513,"profit":923.99},
+{"date":"2026-06-14","label":"6/14","revenue":2771.55,"margin":27.936,"profit":774.26},
+{"date":"2026-06-15","label":"6/15","revenue":3116.06,"margin":28.635,"profit":892.29},
+{"date":"2026-06-16","label":"6/16","revenue":3217.64,"margin":31.039,"profit":998.73},
+{"date":"2026-06-17","label":"6/17","revenue":3127.82,"margin":28.916,"profit":904.44},
+{"date":"2026-06-18","label":"6/18","revenue":3690.13,"margin":32.711,"profit":1207.08},
+{"date":"2026-06-19","label":"6/19","revenue":3915.99,"margin":29.613,"profit":1159.65},
+{"date":"2026-06-20","label":"6/20","revenue":3623.73,"margin":28.622,"profit":1037.18},
+{"date":"2026-06-21","label":"6/21","revenue":3746.56,"margin":29.208,"profit":1094.31},
+{"date":"2026-06-22","label":"6/22","revenue":3452.13,"margin":29.852,"profit":1030.54},
+{"date":"2026-06-23","label":"6/23","revenue":3761.97,"margin":32.364,"profit":1217.54},
+{"date":"2026-06-24","label":"6/24","revenue":3731.44,"margin":31.832,"profit":1187.79},
+{"date":"2026-06-25","label":"6/25","revenue":3962.28,"margin":30.187,"profit":1196.10},
+{"date":"2026-06-26","label":"6/26","revenue":3747.31,"margin":28.521,"profit":1068.75},
+{"date":"2026-06-27","label":"6/27","revenue":4038.31,"margin":29.898,"profit":1207.36},
+{"date":"2026-06-28","label":"6/28","revenue":3916.02,"margin":29.061,"profit":1138.02},
+{"date":"2026-06-29","label":"6/29","revenue":4482.12,"margin":29.333,"profit":1314.73},
+{"date":"2026-06-30","label":"6/30","revenue":4682.94,"margin":29.360,"profit":1374.92},
+{"date":"2026-07-01","label":"7/1","revenue":4261.27,"margin":30.108,"profit":1282.99},
+{"date":"2026-07-02","label":"7/2","revenue":3228.08,"margin":25.647,"profit":827.91},
+{"date":"2026-07-03","label":"7/3","revenue":2833.12,"margin":24.018,"profit":680.45},
+{"date":"2026-07-04","label":"7/4","revenue":2611.60,"margin":27.304,"profit":713.07},
+{"date":"2026-07-05","label":"7/5","revenue":2702.86,"margin":26.355,"profit":712.34},
+{"date":"2026-07-06","label":"7/6","revenue":3013.38,"margin":26.763,"profit":806.47},
+{"date":"2026-07-07","label":"7/7","revenue":2527.11,"margin":24.827,"profit":627.40},
+{"date":"2026-07-08","label":"7/8","revenue":2121.20,"margin":25.754,"profit":546.29},
+{"date":"2026-07-09","label":"7/9","revenue":2007.91,"margin":26.409,"profit":530.27},
+{"date":"2026-07-10","label":"7/10","revenue":1992.72,"margin":25.716,"profit":512.44},
+{"date":"2026-07-11","label":"7/11","revenue":1984.84,"margin":26.027,"profit":516.59},
+{"date":"2026-07-12","label":"7/12","revenue":1903.89,"margin":25.977,"profit":494.58},
+{"date":"2026-07-13","label":"7/13","revenue":1878.44,"margin":25.885,"profit":486.23},
+{"date":"2026-07-14","label":"7/14","revenue":1668.80,"margin":23.796,"profit":397.11},
+{"date":"2026-07-15","label":"7/15","revenue":1807.69,"margin":25.803,"profit":466.44},
+{"date":"2026-07-16","label":"7/16","revenue":1704.46,"margin":24.561,"profit":418.63},
+{"date":"2026-07-17","label":"7/17","revenue":1995.77,"margin":23.725,"profit":473.50},
+{"date":"2026-07-18","label":"7/18","revenue":1924.77,"margin":24.204,"profit":465.86},
+{"date":"2026-07-19","label":"7/19","revenue":2012.27,"margin":23.578,"profit":474.45},
+{"date":"2026-07-20","label":"7/20","revenue":2331.03,"margin":23.676,"profit":551.91},
+{"date":"2026-07-21","label":"7/21","revenue":2341.31,"margin":24.641,"profit":576.92},
+{"date":"2026-07-22","label":"7/22","revenue":2547.95,"margin":24.991,"profit":636.76},
+{"date":"2026-07-23","label":"7/23","revenue":2476.45,"margin":22.280,"profit":551.75},
+{"date":"2026-07-24","label":"7/24","revenue":2574.59,"margin":23.791,"profit":612.52},
+{"date":"2026-07-25","label":"7/25","revenue":2194.73,"margin":24.427,"profit":536.11},
+{"date":"2026-07-26","label":"7/26","revenue":2189.67,"margin":23.857,"profit":522.39},
+{"date":"2026-07-27","label":"7/27","revenue":2228.87,"margin":25.146,"profit":560.48}
+];
+    const thresholdDates = new Set(["2026-06-05","2026-06-13","2026-06-18","2026-06-27","2026-06-30","2026-07-01","2026-07-14","2026-07-24"]);
+    const thresholdLabels = {
+      "2026-06-05":"首次突破 $2,500",
+      "2026-06-13":"首次突破 $3,000",
+      "2026-06-18":"首次突破 $3,500",
+      "2026-06-27":"首次突破 $4,000",
+      "2026-06-30":"首次突破 $4,500",
+      "2026-07-01":"月初回调",
+      "2026-07-14":"全月最低",
+      "2026-07-24":"月末反弹高点"
+    };
+    const colors = {
+      ink: "#17212b",
+      muted: "#617080",
+      grid: "#dde5ec",
+      axis: "#7d8a96",
+      blue: "#2f6fed",
+      green: "#10a37f",
+      amber: "#f2a900",
+      profit: "#d14c32"
+    };
+    const svg = document.getElementById("chart");
+    const box = document.getElementById("chartBox");
+    const tooltip = document.getElementById("tooltip");
+
+    function money(val) { return Number(val).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+    function shortMoney(val) { return Number(val).toLocaleString("en-US",{maximumFractionDigits:0}); }
+    function create(tag, attrs, parent) {
+      parent = parent || svg;
+      const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+      parent.appendChild(el);
+      return el;
+    }
+    function linePath(points) {
+      return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+    }
+
+    function render() {
+      svg.innerHTML = "";
+      const rect = box.getBoundingClientRect();
+      const width = Math.max(1100, rect.width);
+      const height = Math.max(560, rect.height);
+      const pad = { left: 82, right: 34, top: 34, bottom: 72 };
+      const cw = width - pad.left - pad.right;
+      const ch = height - pad.top - pad.bottom;
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+      const yMax = Math.ceil(Math.max(...data.map(d => d.revenue)) / 500) * 500;
+      const t0 = new Date(data[0].date);
+      const t1 = new Date(data[data.length - 1].date);
+      const x = d => pad.left + ((new Date(d.date) - t0) / (t1 - t0)) * cw;
+      const y = v => pad.top + ch - (v / yMax) * ch;
+
+      for (let v = 0; v <= yMax; v += yMax / 5) {
+        const yy = y(v);
+        create("line", { x1: pad.left, y1: yy, x2: width - pad.right, y2: yy, stroke: colors.grid, "stroke-width": 1 });
+        create("text", { x: pad.left - 14, y: yy + 5, "text-anchor": "end", fill: colors.muted, "font-size": 14 }).textContent = shortMoney(v);
+      }
+      create("line", { x1: pad.left, y1: pad.top, x2: pad.left, y2: height - pad.bottom, stroke: colors.axis, "stroke-width": 1.5 });
+      create("line", { x1: pad.left, y1: height - pad.bottom, x2: width - pad.right, y2: height - pad.bottom, stroke: colors.axis, "stroke-width": 1.5 });
+
+      const revPts = data.map(d => ({ ...d, x: x(d), y: y(d.revenue) }));
+      const prfPts = data.map(d => ({ ...d, x: x(d), y: y(d.profit) }));
+
+      create("path", { d: linePath(revPts), fill: "none", stroke: colors.blue, "stroke-width": 3, "stroke-linejoin": "round" });
+      create("path", { d: linePath(prfPts), fill: "none", stroke: colors.profit, "stroke-width": 3, "stroke-linejoin": "round" });
+
+      // 6/7月分界线
+      const jIdx = data.findIndex(d => d.date >= "2026-07-01");
+      if (jIdx >= 0) {
+        const jx = x(data[jIdx]);
+        create("line", { x1: jx, y1: pad.top, x2: jx, y2: height - pad.bottom, stroke: colors.axis, "stroke-width": 1.5, "stroke-dasharray": "6 4", opacity: 0.5 });
+        create("text", { x: jx, y: pad.top - 8, "text-anchor": "middle", fill: colors.muted, "font-size": 13 }).textContent = "7 月";
+      }
+
+      // X轴刻度
+      const tickEvery = 7;
+      data.forEach((d, i) => {
+        if (i % tickEvery !== 0 && i !== data.length - 1) return;
+        const xx = x(d);
+        create("line", { x1: xx, y1: height - pad.bottom, x2: xx, y2: height - pad.bottom + 7, stroke: colors.axis });
+        create("text", { x: xx, y: height - pad.bottom + 28, "text-anchor": "middle", fill: colors.ink, "font-size": 14 }).textContent = d.label;
+      });
+
+      create("text", { x: 24, y: pad.top + ch / 2, fill: colors.muted, "font-size": 15 }).textContent = "USD";
+      create("text", { x: pad.left + cw / 2, y: height - 20, "text-anchor": "middle", fill: colors.muted, "font-size": 15 }).textContent = "日期";
+
+      // Revenue散点
+      revPts.forEach(p => {
+        const isTh = thresholdDates.has(p.date);
+        create("circle", { cx: p.x, cy: p.y, r: isTh ? 6 : 3, fill: isTh ? colors.amber : colors.green, stroke: "#fff", "stroke-width": isTh ? 2 : 0 });
+      });
+      // Profit散点
+      prfPts.forEach(p => {
+        create("circle", { cx: p.x, cy: p.y, r: 2.4, fill: colors.profit });
+      });
+
+      // 突破节点标注
+      const occupied = [];
+      const overlaps = (a, b) => !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+      revPts.filter(p => thresholdDates.has(p.date)).forEach(p => {
+        const tag = thresholdLabels[p.date] || "";
+        const l1 = `${p.label}  Rev ${shortMoney(p.revenue)}`;
+        const l2 = `毛利 ${shortMoney(p.profit)}`;
+        const lw = Math.max(148, Math.max(l1.length, l2.length, tag.length) * 8 + 18);
+        const lh = 58;
+        const tries = [
+          { dx: -lw - 12, dy: -58 }, { dx: 12, dy: -58 },
+          { dx: -lw - 12, dy: 10 }, { dx: 12, dy: 10 },
+          { dx: -lw / 2, dy: -76 }, { dx: -lw / 2, dy: 26 }
+        ];
+        let b = null;
+        for (const t of tries) {
+          const prop = {
+            x: Math.max(pad.left, Math.min(width - pad.right - lw, p.x + t.dx)),
+            y: Math.max(pad.top + 6, Math.min(height - pad.bottom - lh - 8, p.y + t.dy)),
+            w: lw, h: lh
+          };
+          if (!occupied.some(e => overlaps(prop, e))) { b = prop; break; }
+        }
+        if (!b) {
+          b = {
+            x: Math.max(pad.left, Math.min(width - pad.right - lw, p.x - lw / 2)),
+            y: Math.max(pad.top + 6, Math.min(height - pad.bottom - lh - 8, p.y - 58)),
+            w: lw, h: lh
+          };
+        }
+        occupied.push(b);
+        const ax = Math.max(b.x, Math.min(b.x + b.w, p.x));
+        const ay = p.y > b.y + b.h ? b.y + b.h : b.y;
+        create("line", { x1: p.x, y1: p.y, x2: ax, y2: ay, stroke: colors.amber, "stroke-width": 1 });
+        create("rect", { x: b.x, y: b.y, width: b.w, height: b.h, rx: 6, fill: "#fff", stroke: colors.grid, "stroke-width": 1 });
+        create("text", { x: b.x + 9, y: b.y + 17, fill: colors.ink, "font-size": 13, "font-weight": 700 }).textContent = l1;
+        create("text", { x: b.x + 9, y: b.y + 34, fill: colors.profit, "font-size": 13, "font-weight": 700 }).textContent = l2;
+        if (tag) {
+          create("text", { x: b.x + 9, y: b.y + 51, fill: colors.amber, "font-size": 13, "font-weight": 700 }).textContent = tag;
+        }
+      });
+
+      // 悬停交互
+      let guide = null;
+      revPts.forEach((p, i) => {
+        const hitW = Math.max(10, cw / data.length);
+        const hit = create("rect", { x: p.x - hitW / 2, y: pad.top, width: hitW, height: ch, fill: "transparent", style: "cursor:crosshair" });
+        const show = () => {
+          if (guide) guide.remove();
+          guide = create("line", { x1: p.x, y1: pad.top, x2: p.x, y2: height - pad.bottom, stroke: colors.axis, "stroke-width": 1, "stroke-dasharray": "4 4", opacity: 0.8 });
+          tooltip.style.display = "block";
+          tooltip.innerHTML = `<div class="date">${p.date}</div><div class="rev">Revenue：${money(p.revenue)}</div><div>Margin%：${p.margin.toFixed(3)}%</div><div class="profit">毛利：${money(p.profit)}</div>`;
+        };
+        const move = e => {
+          show();
+          const bnds = box.getBoundingClientRect();
+          let left = e.clientX - bnds.left + 16;
+          let top = e.clientY - bnds.top - tooltip.offsetHeight - 14;
+          if (left + tooltip.offsetWidth > bnds.width) left = e.clientX - bnds.left - tooltip.offsetWidth - 16;
+          if (top < 0) top = e.clientY - bnds.top + 18;
+          tooltip.style.left = left + "px";
+          tooltip.style.top = top + "px";
+        };
+        const hide = () => { tooltip.style.display = "none"; if (guide) { guide.remove(); guide = null; } };
+        hit.addEventListener("mouseenter", show);
+        hit.addEventListener("mousemove", move);
+        hit.addEventListener("mouseleave", hide);
+      });
+    }
+
+    render();
+    window.addEventListener("resize", render);
+  </script>
+</body>
+</html>
