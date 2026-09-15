@@ -49,6 +49,7 @@ def parse_args():
     days = 7
     active_days = 3
     ecpc = 0.1
+    ecpc_mode = 'below'
     args = sys.argv[1:]
     i = 0
     while i < len(args):
@@ -62,9 +63,12 @@ def parse_args():
         elif a == '--ecpc' and i + 1 < len(args):
             ecpc = float(args[i + 1])
             i += 2
+        elif a == '--ecpc-mode' and i + 1 < len(args):
+            ecpc_mode = args[i + 1].strip().lower()
+            i += 2
         else:
             i += 1
-    return days, active_days, ecpc
+    return days, active_days, ecpc, ecpc_mode
 
 
 def unique_path(path):
@@ -80,7 +84,7 @@ def unique_path(path):
 
 
 def main():
-    days, active_days, ecpc = parse_args()
+    days, active_days, ecpc, ecpc_mode = parse_args()
     env = load_env()
     os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -119,37 +123,56 @@ def main():
         'FROM offerplus_detail_report GROUP BY adgroup_id'
     )
 
-    sql = '''
+    ecpc_expr = 'CASE WHEN COALESCE(a.clk,0)>0 THEN COALESCE(a.rv,0)/a.clk*1000 ELSE 0 END'
+    if ecpc_mode == 'above':
+        cond_expr = "'P:push'"
+        where_expr = 'a.rv>0 AND a.clk>0 AND a.rv/a.clk*1000 >= %s'
+        order_expr = 'ecpc_val DESC'
+    else:
+        cond_expr = "CASE WHEN COALESCE(a.rv,0)=0 THEN 'A:无流水' ELSE 'B:低ecpc' END"
+        where_expr = '(COALESCE(a.rv,0)=0 OR (a.rv>0 AND a.clk>0 AND a.rv/a.clk*1000 < %s))'
+        order_expr = 'ecpc_val ASC'
+
+    sql = f'''
     SELECT t.offer_id, f.f,
            (SELECT MAX(date) FROM offerplus_offer_daily_status s
              WHERE s.offer_id=t.offer_id AND s.date BETWEEN %s AND %s AND s.has_online=1) last_on,
            COALESCE(a.rv,0), COALESCE(a.clk,0), COALESCE(a.cv,0),
-           CASE WHEN COALESCE(a.rv,0)=0 THEN 'A:无流水' ELSE 'B:低ecpc' END cond
+           {ecpc_expr} ecpc_val,
+           {cond_expr} cond
     FROM tmp_act t
     JOIN tmp_first f ON t.offer_id=f.offer_id
     LEFT JOIN tmp_agg a ON t.offer_id=a.oid
     WHERE f.f <= %s
-      AND (COALESCE(a.rv,0)=0 OR (a.rv>0 AND a.clk>0 AND a.rv/a.clk*1000 < %s))
-    ORDER BY cond, t.offer_id
+      AND {where_expr}
+    ORDER BY {order_expr}
     '''
     cur.execute(sql, (active_start, base_date, cutoff, ecpc))
     rows = cur.fetchall()
 
-    out_path = unique_path(os.path.join(OUT_DIR, f'offer_建议关停_{base_date}.csv'))
+    if ecpc_mode == 'above':
+        fname = f'offer_push名单_{base_date}.csv'
+    else:
+        fname = f'offer_建议关停_{base_date}.csv'
+    out_path = unique_path(os.path.join(OUT_DIR, fname))
     with open(out_path, 'w', newline='', encoding='utf-8-sig') as f:
         w = csv.writer(f)
         w.writerow(['Offer ID', '入库日期', f'最后在线日期(近{active_days}天)', '全程Revenue',
-                    '全程Click', '全程Conversion', '命中条件'])
+                    '全程Click', '全程Conversion', '千次收入(eCPC)', '命中条件'])
         for r in rows:
-            w.writerow([r[0], r[1], r[2] or '', f'{float(r[3]):.2f}', r[4], r[5], r[6]])
-
-    n_a = sum(1 for r in rows if r[6].startswith('A'))
-    n_b = len(rows) - n_a
+            w.writerow([r[0], r[1], r[2] or '', f'{float(r[3]):.2f}', r[4], r[5],
+                        f'{float(r[6]):.2f}', r[7]])
 
     print('=' * 50)
-    print(f'基准日: {base_date} | 入库满 {days} 天 | 近 {active_days} 天活跃 | eCPC < {ecpc}')
-    print(f'A 无流水: {n_a} 个')
-    print(f'B 低eCPC: {n_b} 个')
+    print(f'基准日: {base_date} | 入库满 {days} 天 | 近 {active_days} 天活跃')
+    if ecpc_mode == 'above':
+        print(f'口径    : push名单（千次收入 >= {ecpc}）')
+        print(f'P 达标  : {len(rows)} 个')
+    else:
+        print(f'口径    : 关停名单（千次收入 < {ecpc}）')
+        n_a = sum(1 for r in rows if r[7].startswith('A'))
+        print(f'A 无流水: {n_a} 个')
+        print(f'B 低eCPC: {len(rows) - n_a} 个')
     print(f'合计    : {len(rows)} 个')
     print(f'文件    : {out_path}')
     print('=' * 50)
