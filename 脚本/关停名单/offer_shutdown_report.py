@@ -46,7 +46,8 @@ def load_env():
 
 
 def parse_args():
-    days = 15
+    days = 7
+    active_days = 3
     ecpc = 0.1
     args = sys.argv[1:]
     i = 0
@@ -55,12 +56,15 @@ def parse_args():
         if a == '--days' and i + 1 < len(args):
             days = int(args[i + 1])
             i += 2
+        elif a == '--active-days' and i + 1 < len(args):
+            active_days = int(args[i + 1])
+            i += 2
         elif a == '--ecpc' and i + 1 < len(args):
             ecpc = float(args[i + 1])
             i += 2
         else:
             i += 1
-    return days, ecpc
+    return days, active_days, ecpc
 
 
 def unique_path(path):
@@ -81,7 +85,7 @@ def main():
     except Exception:
         pass
 
-    days, ecpc = parse_args()
+    days, active_days, ecpc = parse_args()
     env = load_env()
     os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -99,6 +103,7 @@ def main():
 
     base_dt = datetime.strptime(base_date, '%Y%m%d')
     cutoff = (base_dt - timedelta(days=days)).strftime('%Y%m%d')
+    active_start = (base_dt - timedelta(days=active_days)).strftime('%Y%m%d')
 
     cur.execute('DROP TEMPORARY TABLE IF EXISTS tmp_act')
     cur.execute('DROP TEMPORARY TABLE IF EXISTS tmp_agg')
@@ -106,7 +111,7 @@ def main():
         'CREATE TEMPORARY TABLE tmp_act AS '
         'SELECT DISTINCT offer_id FROM offerplus_offer_daily_status '
         'WHERE date BETWEEN %s AND %s AND has_online=1',
-        (cutoff, base_date),
+        (active_start, base_date),
     )
     cur.execute(
         'CREATE TEMPORARY TABLE tmp_agg AS '
@@ -125,13 +130,13 @@ def main():
       AND (a.rv=0 OR (a.rv>0 AND a.clk>0 AND a.rv/a.clk*1000 < %s))
     ORDER BY cond, a.oid
     '''
-    cur.execute(sql, (cutoff, base_date, cutoff, ecpc))
+    cur.execute(sql, (active_start, base_date, cutoff, ecpc))
     rows = cur.fetchall()
 
     out_path = unique_path(os.path.join(OUT_DIR, f'offer_建议关停_{base_date}.csv'))
     with open(out_path, 'w', newline='', encoding='utf-8-sig') as f:
         w = csv.writer(f)
-        w.writerow(['Offer ID', '入库日期', f'最后在线日期(近{days}天)', '全程Revenue',
+        w.writerow(['Offer ID', '入库日期', f'最后在线日期(近{active_days}天)', '全程Revenue',
                     '全程Click', '全程Conversion', '命中条件'])
         for r in rows:
             w.writerow([r[0], r[1], r[2] or '', f'{float(r[3]):.2f}', r[4], r[5], r[6]])
@@ -140,7 +145,7 @@ def main():
     n_b = len(rows) - n_a
 
     print('=' * 50)
-    print(f'基准日: {base_date} | 入库天数阈值: {days} | eCPC 阈值: {ecpc}')
+    print(f'基准日: {base_date} | 入库满 {days} 天 | 近 {active_days} 天活跃 | eCPC < {ecpc}')
     print(f'A 无流水: {n_a} 个')
     print(f'B 低eCPC: {n_b} 个')
     print(f'合计    : {len(rows)} 个')
