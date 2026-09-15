@@ -103,9 +103,10 @@ def main():
 
     base_dt = datetime.strptime(base_date, '%Y%m%d')
     cutoff = (base_dt - timedelta(days=days)).strftime('%Y%m%d')
-    active_start = (base_dt - timedelta(days=active_days)).strftime('%Y%m%d')
+    active_start = (base_dt - timedelta(days=active_days - 1)).strftime('%Y%m%d')
 
     cur.execute('DROP TEMPORARY TABLE IF EXISTS tmp_act')
+    cur.execute('DROP TEMPORARY TABLE IF EXISTS tmp_first')
     cur.execute('DROP TEMPORARY TABLE IF EXISTS tmp_agg')
     cur.execute(
         'CREATE TEMPORARY TABLE tmp_act AS '
@@ -114,21 +115,27 @@ def main():
         (active_start, base_date),
     )
     cur.execute(
+        'CREATE TEMPORARY TABLE tmp_first AS '
+        'SELECT offer_id, MIN(date) f FROM offerplus_offer_daily_status GROUP BY offer_id'
+    )
+    cur.execute(
         'CREATE TEMPORARY TABLE tmp_agg AS '
-        'SELECT adgroup_id oid, MIN(date) d0, SUM(revenue) rv, SUM(click) clk, SUM(conversion) cv '
+        'SELECT adgroup_id oid, SUM(revenue) rv, SUM(click) clk, SUM(conversion) cv '
         'FROM offerplus_detail_report GROUP BY adgroup_id'
     )
 
     sql = '''
-    SELECT a.oid, a.d0,
+    SELECT t.offer_id, f.f,
            (SELECT MAX(date) FROM offerplus_offer_daily_status s
-             WHERE s.offer_id=a.oid AND s.date BETWEEN %s AND %s AND s.has_online=1) last_on,
-           a.rv, a.clk, a.cv,
-           CASE WHEN a.rv=0 THEN 'A:无流水' ELSE 'B:低ecpc' END cond
-    FROM tmp_agg a JOIN tmp_act t ON a.oid=t.offer_id
-    WHERE a.d0 <= %s
-      AND (a.rv=0 OR (a.rv>0 AND a.clk>0 AND a.rv/a.clk*1000 < %s))
-    ORDER BY cond, a.oid
+             WHERE s.offer_id=t.offer_id AND s.date BETWEEN %s AND %s AND s.has_online=1) last_on,
+           COALESCE(a.rv,0), COALESCE(a.clk,0), COALESCE(a.cv,0),
+           CASE WHEN COALESCE(a.rv,0)=0 THEN 'A:无流水' ELSE 'B:低ecpc' END cond
+    FROM tmp_act t
+    JOIN tmp_first f ON t.offer_id=f.offer_id
+    LEFT JOIN tmp_agg a ON t.offer_id=a.oid
+    WHERE f.f <= %s
+      AND (COALESCE(a.rv,0)=0 OR (a.rv>0 AND a.clk>0 AND a.rv/a.clk*1000 < %s))
+    ORDER BY cond, t.offer_id
     '''
     cur.execute(sql, (active_start, base_date, cutoff, ecpc))
     rows = cur.fetchall()
