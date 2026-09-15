@@ -80,11 +80,6 @@ def unique_path(path):
 
 
 def main():
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
-
     days, active_days, ecpc = parse_args()
     env = load_env()
     os.makedirs(OUT_DIR, exist_ok=True)
