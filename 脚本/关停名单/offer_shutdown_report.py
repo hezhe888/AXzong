@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""offer 建议关停名单生成
+"""offer 名单生成（关停 / push）
 
 规则:
-  A 无流水: 入库>=N天 且 全程 revenue=0
-  B 低eCPC : 入库>=N天 且 revenue>0 且 click>0 且 累计 revenue/click*1000 < 阈值
+  below(关停, Revenue视角): 入库>=N天 且 近K天在线 且 (全程 revenue=0 或 (revenue>0 且 click>0 且 revenue/click*1000 < 阈值))
+  above(push , Payout 视角): 入库>=N天 且 近K天在线 且 payout>0 且 click>0 且 payout/click*1000 >= 阈值
 """
 import os
 import sys
@@ -119,25 +119,27 @@ def main():
     )
     cur.execute(
         'CREATE TEMPORARY TABLE tmp_agg AS '
-        'SELECT adgroup_id oid, SUM(revenue) rv, SUM(click) clk, SUM(conversion) cv '
+        'SELECT adgroup_id oid, SUM(revenue) rv, SUM(payout) po, SUM(click) clk, SUM(conversion) cv '
         'FROM offerplus_detail_report GROUP BY adgroup_id'
     )
 
-    ecpc_expr = 'CASE WHEN COALESCE(a.clk,0)>0 THEN COALESCE(a.rv,0)/a.clk*1000 ELSE 0 END'
     if ecpc_mode == 'above':
+        ecpc_expr = 'CASE WHEN COALESCE(a.clk,0)>0 THEN COALESCE(a.po,0)/a.clk*1000 ELSE 0 END'
         cond_expr = "'P:push'"
-        where_expr = 'a.rv>0 AND a.clk>0 AND a.rv/a.clk*1000 >= %s'
+        where_expr = 'a.po>0 AND a.clk>0 AND a.po/a.clk*1000 >= %s'
         order_expr = 'ecpc_val DESC'
     else:
+        ecpc_expr = 'CASE WHEN COALESCE(a.clk,0)>0 THEN COALESCE(a.rv,0)/a.clk*1000 ELSE 0 END'
         cond_expr = "CASE WHEN COALESCE(a.rv,0)=0 THEN 'A:无流水' ELSE 'B:低ecpc' END"
         where_expr = '(COALESCE(a.rv,0)=0 OR (a.rv>0 AND a.clk>0 AND a.rv/a.clk*1000 < %s))'
         order_expr = 'ecpc_val ASC'
 
+    val_expr = 'COALESCE(a.po,0)' if ecpc_mode == 'above' else 'COALESCE(a.rv,0)'
     sql = f'''
     SELECT t.offer_id, f.f,
            (SELECT MAX(date) FROM offerplus_offer_daily_status s
              WHERE s.offer_id=t.offer_id AND s.date BETWEEN %s AND %s AND s.has_online=1) last_on,
-           COALESCE(a.rv,0), COALESCE(a.clk,0), COALESCE(a.cv,0),
+           {val_expr}, COALESCE(a.clk,0), COALESCE(a.cv,0),
            {ecpc_expr} ecpc_val,
            {cond_expr} cond
     FROM tmp_act t
@@ -152,13 +154,15 @@ def main():
 
     if ecpc_mode == 'above':
         fname = f'offer_push名单_{base_date}.csv'
+        val_name, ecpc_name = '全程Payout', '千次payout(eCPC)'
     else:
         fname = f'offer_建议关停_{base_date}.csv'
+        val_name, ecpc_name = '全程Revenue', '千次收入(eCPC)'
     out_path = unique_path(os.path.join(OUT_DIR, fname))
     with open(out_path, 'w', newline='', encoding='utf-8-sig') as f:
         w = csv.writer(f)
-        w.writerow(['Offer ID', '入库日期', f'最后在线日期(近{active_days}天)', '全程Revenue',
-                    '全程Click', '全程Conversion', '千次收入(eCPC)', '命中条件'])
+        w.writerow(['Offer ID', '入库日期', f'最后在线日期(近{active_days}天)', val_name,
+                    '全程Click', '全程Conversion', ecpc_name, '命中条件'])
         for r in rows:
             w.writerow([r[0], r[1], r[2] or '', f'{float(r[3]):.2f}', r[4], r[5],
                         f'{float(r[6]):.2f}', r[7]])
@@ -166,10 +170,10 @@ def main():
     print('=' * 50)
     print(f'基准日: {base_date} | 入库满 {days} 天 | 近 {active_days} 天活跃')
     if ecpc_mode == 'above':
-        print(f'口径    : push名单（千次收入 >= {ecpc}）')
+        print(f'口径    : push名单（Payout视角，千次payout >= {ecpc}）')
         print(f'P 达标  : {len(rows)} 个')
     else:
-        print(f'口径    : 关停名单（千次收入 < {ecpc}）')
+        print(f'口径    : 关停名单（Revenue视角，千次收入 < {ecpc}）')
         n_a = sum(1 for r in rows if r[7].startswith('A'))
         print(f'A 无流水: {n_a} 个')
         print(f'B 低eCPC: {len(rows) - n_a} 个')

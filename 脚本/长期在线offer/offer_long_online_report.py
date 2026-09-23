@@ -4,7 +4,8 @@
 规则:
   1) 当前在线: 基准日最后一个非 NULL 小时 = 1
   2) 连续在线 >= min_hours: 从当前小时往前逐小时数, 遇 0 或某天无记录即中断
-  3) ecpc > 0 时: 再筛 全程千次收入 revenue/click*1000 > 阈值 (ecpc=0 则不筛)
+  3) ecpc > 0 时: 再筛 全程 payout/click*1000 > 阈值 (ecpc=0 则不筛)
+  4) min_conv > 0 时: 再筛 全程转化数 SUM(conversion) >= min_conv (min_conv=0 则不筛)
 """
 import os
 import sys
@@ -53,6 +54,7 @@ def load_env():
 def parse_args():
     min_hours = 48
     ecpc = 0.5
+    min_conv = 0
     args = sys.argv[1:]
     i = 0
     while i < len(args):
@@ -63,9 +65,12 @@ def parse_args():
         elif a == '--ecpc' and i + 1 < len(args):
             ecpc = float(args[i + 1])
             i += 2
+        elif a == '--min-conv' and i + 1 < len(args):
+            min_conv = int(args[i + 1])
+            i += 2
         else:
             i += 1
-    return min_hours, ecpc
+    return min_hours, ecpc, min_conv
 
 
 def unique_path(path):
@@ -109,7 +114,7 @@ def calc_streak(base_dt, lookback_days, days_dict):
 
 
 def main():
-    min_hours, ecpc = parse_args()
+    min_hours, ecpc, min_conv = parse_args()
     env = load_env()
     os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -163,7 +168,7 @@ def main():
             hits.append((oid, st))
     n_streak = len(hits)
 
-    rev = {}
+    agg = {}
     if hits:
         cur.execute('DROP TEMPORARY TABLE IF EXISTS tmp_out')
         cur.execute(
@@ -172,46 +177,57 @@ def main():
         )
         cur.executemany('INSERT INTO tmp_out VALUES (%s)', [(o,) for o, _ in hits])
         cur.execute(
-            'SELECT o.offer_id, SUM(d.revenue), SUM(d.click), SUM(d.conversion) '
+            'SELECT o.offer_id, SUM(d.payout), SUM(d.click), SUM(d.conversion) '
             'FROM tmp_out o '
             'LEFT JOIN offerplus_detail_report d ON o.offer_id=d.adgroup_id '
             'GROUP BY o.offer_id'
         )
-        for oid, rv, clk, cv in cur.fetchall():
-            rev[str(oid)] = (float(rv or 0), int(clk or 0), int(cv or 0))
+        for oid, po, clk, cv in cur.fetchall():
+            agg[str(oid)] = (float(po or 0), int(clk or 0), int(cv or 0))
 
     rows = []
     for oid, st in hits:
-        rv, clk, cv = rev.get(oid, (0.0, 0, 0))
-        epc = rv / clk * 1000 if clk > 0 else 0.0
-        rows.append((oid, st, rv, clk, cv, epc))
+        po, clk, cv = agg.get(oid, (0.0, 0, 0))
+        epc = po / clk * 1000 if clk > 0 else 0.0
+        rows.append((oid, st, po, clk, cv, epc))
 
     if ecpc > 0:
         rows = [r for r in rows if r[5] > ecpc]
+    n_ecpc = len(rows)
+    if min_conv > 0:
+        rows = [r for r in rows if r[4] >= min_conv]
+    n_conv = len(rows)
 
     rows.sort(key=lambda x: (-x[5], -x[1], x[0]))
 
+    parts = [f'offer_长期在线_{min_hours}h']
     if ecpc > 0:
-        fname = f'offer_长期在线_{min_hours}h_ecpc{ecpc:g}_{base_date}.csv'
-    else:
-        fname = f'offer_长期在线_{min_hours}h_{base_date}.csv'
+        parts.append(f'ecpc{ecpc:g}')
+    if min_conv > 0:
+        parts.append(f'conv{min_conv}')
+    parts.append(base_date)
+    fname = '_'.join(parts) + '.csv'
     out_path = unique_path(os.path.join(OUT_DIR, fname))
     with open(out_path, 'w', newline='', encoding='utf-8-sig') as f:
         w = csv.writer(f)
-        w.writerow(['Offer ID', 'pkg_name', 'GEO', '连续在线小时', '全程Revenue',
+        w.writerow(['Offer ID', 'pkg_name', 'GEO', '连续在线小时', '全程Payout',
                     '全程Click', '全程Conversion', '全程eCPC'])
-        for oid, st, rv, clk, cv, epc in rows:
+        for oid, st, po, clk, cv, epc in rows:
             pkg, country = info.get(oid, ('', ''))
-            w.writerow([oid, pkg, country, st, f'{rv:.2f}', clk, cv, f'{epc:.2f}'])
+            w.writerow([oid, pkg, country, st, f'{po:.2f}', clk, cv, f'{epc:.2f}'])
 
     print('=' * 50)
     print(f'基准日: {base_date} | 回溯 {lookback_days} 天')
     print(f'当前在线: {n_online} 个')
     print(f'连续 >= {min_hours} 小时: {n_streak} 个')
     if ecpc > 0:
-        print(f'eCPC > {ecpc}: {len(rows)} 个')
+        print(f'payout eCPC > {ecpc}: {n_ecpc} 个')
     else:
         print('eCPC 筛选: 未启用（阈值=0）')
+    if min_conv > 0:
+        print(f'转化数 >= {min_conv}: {n_conv} 个')
+    else:
+        print('转化数筛选: 未启用（阈值=0）')
     print(f'合计输出: {len(rows)} 个')
     print(f'文件: {out_path}')
     print('=' * 50)

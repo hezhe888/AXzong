@@ -1,9 +1,9 @@
 脚本逻辑
-1.参数:--days 7 (入库满N天)、--active-days 3 (活跃窗口K天)、--ecpc 0.1 (阈值)、--ecpc-mode below (below=关停名单, above=push名单)
+1.参数:--days 7 (入库满N天)、--active-days 3 (活跃窗口K天)、--ecpc 0.1 (阈值)、--ecpc-mode below (below=关停名单/Revenue视角, above=push名单/Payout视角)
 2.基准日=daily_status最新日期;活跃=近K天内至少一天在线(has_online=1)
 3.入库=监控首现日期<=基准日-N天
 4.筛选条件:
   below(关停):无流水(全程revenue=0或detail无记录) 或 有收入且全程千次收入<阈值
-  above(push):有收入有点击且全程千次收入>=阈值
-5.输出列:Offer ID|入库日期|最后在线日期(近K天)|全程Revenue|全程Click|全程Conversion|千次收入(eCPC)|命中条件
+  above(push):有payout有点击且全程千次payout>=阈值
+5.输出列:below为 全程Revenue|千次收入(eCPC);above为 全程Payout|千次payout(eCPC);其余列相同(入库日期/最后在线日期/Click/Conversion/命中条件)
 6.输出:below按eCPC升序/above按eCPC降序 + 防覆盖 + 自动打开
