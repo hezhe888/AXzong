@@ -1,0 +1,7 @@
+脚本逻辑
+1.参数:--days 15 (入库满N天)、--no-rev-days 15 (无收入窗口M天)、--active-days 1 (活跃窗口K天)
+2.基准日=daily_status最新日期;活跃=近K天内至少一天在线(has_online=1)
+3.入库=监控首现日期<=基准日-N天
+4.筛选条件:近M天内revenue=0(含detail无记录)
+5.输出列:Offer ID|入库日期|近M天Revenue|近M天Click|近M天Conversion|近M天eCPC|全程Revenue|全程eCPC
+6.输出:按全程Revenue降序 + 防覆盖 + 自动打开

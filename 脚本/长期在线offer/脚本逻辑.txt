@@ -1,0 +1,9 @@
+脚本逻辑
+1.参数:--min-hours 48
+2.基准日=daily_status
+(连续在线阈值)、--ecpc0.5 (0=不筛eCPC)
+最新日期;当前在线=当天最后非NULL小时=1
+3.取当天行的 pkg_name、country (GEO)
+4.自动回溯N天(N=阈值天数+3),Python逐小时数连续在王线时长
+5.筛连续>48h→ (eCPC>0时)全程 eCPC > 0.5
+6.输出+eCPC降序+防覆盖+自动打开
