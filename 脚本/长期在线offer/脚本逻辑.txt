@@ -4,5 +4,5 @@
 3.取当天行的 pkg_name、country (GEO)
 4.自动回溯N天(N=阈值天数+3),Python逐小时数连续在线时长
 5.筛选链:连续>=N小时 -> payout eCPC>阈值(>0时) -> 转化数>=阈值(>0时)
-6.输出列:Offer ID|pkg_name|GEO|连续在线小时|全程Payout|全程Click|全程Conversion|全程eCPC(全程=payout/click*1000)
-7.输出:按全程eCPC降序+防覆盖+自动打开;文件名offer_长期在线_{N}h[_ecpc{X}][_conv{V}]_{基准日}.csv
+6.输出列:Offer ID|pkg_name|GEO|连续在线小时|全程Payout|全程Click|全程Conversion|全程payout eCPC(全程=payout/click*1000)
+7.输出:按全程payout eCPC降序+防覆盖+自动打开;文件名offer_长期在线_{N}h[_ecpc{X}][_conv{V}]_{基准日}.csv

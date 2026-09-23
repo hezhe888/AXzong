@@ -154,10 +154,10 @@ def main():
 
     if ecpc_mode == 'above':
         fname = f'offer_push名单_{base_date}.csv'
-        val_name, ecpc_name = '全程Payout', '千次payout(eCPC)'
+        val_name, ecpc_name = '全程Payout', '千次payout eCPC'
     else:
         fname = f'offer_建议关停_{base_date}.csv'
-        val_name, ecpc_name = '全程Revenue', '千次收入(eCPC)'
+        val_name, ecpc_name = '全程Revenue', '千次revenue eCPC'
     out_path = unique_path(os.path.join(OUT_DIR, fname))
     with open(out_path, 'w', newline='', encoding='utf-8-sig') as f:
         w = csv.writer(f)

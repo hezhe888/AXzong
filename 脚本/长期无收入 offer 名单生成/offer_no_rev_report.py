@@ -151,7 +151,7 @@ def main():
     with open(out_path, 'w', newline='', encoding='utf-8-sig') as f:
         w = csv.writer(f)
         w.writerow(['Offer ID', '入库日期', f'近{no_rev_days}天Revenue', f'近{no_rev_days}天Click',
-                    f'近{no_rev_days}天Conversion', f'近{no_rev_days}天eCPC', '全程Revenue', '全程eCPC'])
+                    f'近{no_rev_days}天Conversion', f'近{no_rev_days}天revenue eCPC', '全程Revenue', '全程revenue eCPC'])
         for r in rows:
             w.writerow([r[0], r[1], f'{float(r[2]):.2f}', r[3], r[4], f'{float(r[5]):.2f}',
                         f'{float(r[6]):.2f}', f'{float(r[7]):.2f}'])

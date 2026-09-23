@@ -8,7 +8,7 @@ echo   1) 当前在线（最后记录小时为 1）
 echo   2) 连续在线满 N 小时（断 1 小时即中断）
 echo   3) payout eCPC 大于 M（M=0 则不筛）
 echo   4) 转化数大于等于 V（V=0 则不筛）
-echo   5) 按全程 eCPC 降序排列
+echo   5) 按全程 payout eCPC 降序排列
 echo.
 set /p HOURS=请输入连续在线小时阈值（默认 48，直接回车）: 
 if "%HOURS%"=="" set HOURS=48

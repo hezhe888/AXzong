@@ -211,7 +211,7 @@ def main():
     with open(out_path, 'w', newline='', encoding='utf-8-sig') as f:
         w = csv.writer(f)
         w.writerow(['Offer ID', 'pkg_name', 'GEO', '连续在线小时', '全程Payout',
-                    '全程Click', '全程Conversion', '全程eCPC'])
+                    '全程Click', '全程Conversion', '全程payout eCPC'])
         for oid, st, po, clk, cv, epc in rows:
             pkg, country = info.get(oid, ('', ''))
             w.writerow([oid, pkg, country, st, f'{po:.2f}', clk, cv, f'{epc:.2f}'])
