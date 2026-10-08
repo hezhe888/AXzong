@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>月维度 Revenue & 毛利（Q3）</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #617080;
+      --grid: #e8edf3;
+      --axis: #7d8a96;
+      --blue: #2f6fed;
+      --profit: #d94f2b;
+      --bg: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f5f7fa;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+    }
+    .wrap {
+      width: min(1500px, calc(100vw - 32px));
+      margin: 24px auto;
+      background: var(--bg);
+      border: 1px solid #e5ebf2;
+      border-radius: 8px;
+      padding: 28px 30px 22px;
+      box-shadow: 0 10px 30px rgba(23, 33, 43, 0.07);
+    }
+    .head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 8px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.15;
+    }
+    .sub {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+    .legend {
+      display: flex;
+      gap: 22px;
+      align-items: center;
+      margin-top: 10px;
+      font-size: 15px;
+      white-space: nowrap;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .swatch {
+      width: 28px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    .chart-box {
+      position: relative;
+      width: 100%;
+      height: 560px;
+      min-height: 420px;
+    }
+    svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      overflow: visible;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="head">
+      <div>
+        <h1>月维度 Revenue & 毛利</h1>
+        <div class="sub">2026 Q3（7-9月）| 毛利 = Revenue - Payout</div>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background: var(--blue)"></i>Revenue</span>
+        <span><i class="swatch" style="background: var(--profit)"></i>毛利</span>
+      </div>
+    </div>
+    <div id="chartBox" class="chart-box">
+      <svg id="chart" role="img" aria-label="月维度 Revenue 与毛利柱状图"></svg>
+    </div>
+  </main>
+  <script>
+    const data = [{"month": "07月", "revenue": 72131.83, "profit": 18176.49}, {"month": "08月", "revenue": 70188.41, "profit": 17508.55}, {"month": "09月", "revenue": 89369.68, "profit": 22310.25}];
+    const colors = {
+      ink: "#17212b",
+      muted: "#617080",
+      grid: "#e8edf3",
+      axis: "#7d8a96",
+      blue: "#2f6fed",
+      profit: "#d94f2b"
+    };
+    const svg = document.getElementById("chart");
+    const box = document.getElementById("chartBox");
+
+    function shortMoney(value) {
+      return Number(value).toLocaleString("en-US", { maximumFractionDigits: 0 });
+    }
+    function wan(value) {
+      return (value / 10000).toFixed(1) + "W";
+    }
+    function create(tag, attrs, parent) {
+      parent = parent || svg;
+      const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
+      parent.appendChild(el);
+      return el;
+    }
+
+    function render() {
+      svg.innerHTML = "";
+      const rect = box.getBoundingClientRect();
+      const width = Math.max(900, rect.width);
+      const height = Math.max(480, rect.height);
+      const pad = { left: 76, right: 30, top: 42, bottom: 64 };
+      const chartW = width - pad.left - pad.right;
+      const chartH = height - pad.top - pad.bottom;
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+      const maxRevenue = Math.max(...data.map(d => d.revenue));
+      const yMax = Math.ceil(maxRevenue / 20000) * 20000;
+      const y = value => pad.top + chartH - (value / yMax) * chartH;
+
+      for (let i = 0; i <= 5; i++) {
+        const value = yMax * i / 5;
+        const yy = y(value);
+        create("line", { x1: pad.left, y1: yy, x2: width - pad.right, y2: yy, stroke: colors.grid, "stroke-width": 1 });
+        create("text", { x: pad.left - 14, y: yy + 5, "text-anchor": "end", fill: colors.muted, "font-size": 14 })
+          .textContent = i === 0 ? "0" : wan(value);
+      }
+
+      create("line", { x1: pad.left, y1: pad.top, x2: pad.left, y2: height - pad.bottom, stroke: colors.axis, "stroke-width": 1.5 });
+      create("line", { x1: pad.left, y1: height - pad.bottom, x2: width - pad.right, y2: height - pad.bottom, stroke: colors.axis, "stroke-width": 1.5 });
+
+      create("text", { x: 24, y: pad.top + chartH / 2, fill: colors.muted, "font-size": 15 }).textContent = "金额";
+      create("text", { x: pad.left + chartW / 2, y: height - 20, "text-anchor": "middle", fill: colors.muted, "font-size": 15 }).textContent = "日期";
+
+      const groupW = chartW / data.length;
+      const barW = Math.min(90, groupW * 0.22);
+      const gap = 10;
+      data.forEach((d, i) => {
+        const cx = pad.left + groupW * i + groupW / 2;
+        create("rect", { x: cx - barW - gap / 2, y: y(d.revenue), width: barW, height: chartH - (y(d.revenue) - pad.top), rx: 6, fill: colors.blue });
+        create("text", { x: cx - barW / 2 - gap / 2, y: y(d.revenue) - 12, "text-anchor": "middle", fill: colors.ink, "font-size": 15, "font-weight": 700 })
+          .textContent = shortMoney(d.revenue);
+        create("rect", { x: cx + gap / 2, y: y(d.profit), width: barW, height: chartH - (y(d.profit) - pad.top), rx: 6, fill: colors.profit });
+        create("text", { x: cx + barW / 2 + gap / 2, y: y(d.profit) - 12, "text-anchor": "middle", fill: colors.ink, "font-size": 15, "font-weight": 700 })
+          .textContent = shortMoney(d.profit);
+        create("text", { x: cx, y: height - pad.bottom + 28, "text-anchor": "middle", fill: colors.ink, "font-size": 15 }).textContent = d.month;
+      });
+    }
+
+    render();
+    window.addEventListener("resize", render);
+  </script>
+</body>
+</html>
