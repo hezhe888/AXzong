@@ -241,7 +241,7 @@
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>Advertiser</th><th>Revenue</th><th>毛利</th><th>占比</th><th>毛利率</th></tr>
+              <tr><th>Advertiser</th><th>Revenue</th><th>毛利</th><th>毛利率</th><th>占比</th></tr>
             </thead>
             <tbody id="rows"></tbody>
           </table>
@@ -347,8 +347,8 @@
           <td title="${item.adv}"><span class="dot" style="background:${palette[index % palette.length]}"></span>${item.adv}</td>
           <td>${shortMoney(item.revenue)}</td>
           <td>${shortMoney(item.profit)}</td>
-          <td>${pct(item.share)}</td>
           <td>${pct(item.margin)}</td>
+          <td>${pct(item.share)}</td>
         `;
         tr.addEventListener("mouseenter", () => setSelected(item));
         tr.addEventListener("click", () => setSelected(item));
