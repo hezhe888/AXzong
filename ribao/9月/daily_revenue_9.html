@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>日维度 Revenue & 毛利（9月）</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #617080;
+      --grid: #dde5ec;
+      --axis: #7d8a96;
+      --blue: #2f6fed;
+      --green: #10a37f;
+      --amber: #f2a900;
+      --profit: #d14c32;
+      --bg: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f5f7fa;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+    }
+    .wrap {
+      width: min(1800px, calc(100vw - 32px));
+      margin: 24px auto;
+      background: var(--bg);
+      border: 1px solid #e5ebf2;
+      border-radius: 8px;
+      padding: 28px 30px 22px;
+      box-shadow: 0 10px 30px rgba(23, 33, 43, 0.07);
+    }
+    .head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 8px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+    .sub {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+    .legend {
+      display: flex;
+      gap: 22px;
+      align-items: center;
+      margin-top: 10px;
+      font-size: 15px;
+      white-space: nowrap;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .swatch {
+      width: 28px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    .chart-box {
+      position: relative;
+      width: 100%;
+      height: min(760px, calc(100vh - 190px));
+      min-height: 560px;
+    }
+    svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      overflow: visible;
+    }
+    .tooltip {
+      position: absolute;
+      pointer-events: none;
+      display: none;
+      min-width: 190px;
+      padding: 10px 12px;
+      border: 1px solid #d8e1eb;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 8px 24px rgba(23, 33, 43, 0.16);
+      font-size: 14px;
+      line-height: 1.55;
+      z-index: 5;
+    }
+    .tooltip .date { font-weight: 700; margin-bottom: 4px; }
+    .tooltip .rev { color: var(--blue); font-weight: 700; }
+    .tooltip .profit { color: var(--profit); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="head">
+      <div>
+        <h1>日维度 Revenue & 毛利（9月）</h1>
+        <div class="sub">9月1日-9月30日明细；鼠标悬停任意日期查看 Revenue、Margin%、毛利</div>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background: var(--blue)"></i>Revenue</span>
+        <span><i class="swatch" style="background: var(--profit)"></i>毛利</span>
+        <span><i class="swatch" style="background: var(--amber)"></i>突破节点</span>
+      </div>
+    </div>
+    <div id="chartBox" class="chart-box">
+      <svg id="chart" role="img" aria-label="日维度 Revenue 与毛利交互图"></svg>
+      <div id="tooltip" class="tooltip"></div>
+    </div>
+  </main>
+  <script>
+    const data = [
+{"date":"2026-09-01","label":"9/1","revenue":2478.17,"margin":22.981,"profit":569.5},
+{"date":"2026-09-02","label":"9/2","revenue":2724.75,"margin":22.899,"profit":623.95},
+{"date":"2026-09-03","label":"9/3","revenue":2652.53,"margin":23.311,"profit":618.33},
+{"date":"2026-09-04","label":"9/4","revenue":2766.45,"margin":24.556,"profit":679.33},
+{"date":"2026-09-05","label":"9/5","revenue":2736.06,"margin":24.335,"profit":665.82},
+{"date":"2026-09-06","label":"9/6","revenue":2576.09,"margin":25.381,"profit":653.83},
+{"date":"2026-09-07","label":"9/7","revenue":3041.13,"margin":24.655,"profit":749.8},
+{"date":"2026-09-08","label":"9/8","revenue":3768.21,"margin":24.392,"profit":919.15},
+{"date":"2026-09-09","label":"9/9","revenue":3115.62,"margin":24.657,"profit":768.21},
+{"date":"2026-09-10","label":"9/10","revenue":3023.71,"margin":25.138,"profit":760.09},
+{"date":"2026-09-11","label":"9/11","revenue":3178.63,"margin":25.166,"profit":799.92},
+{"date":"2026-09-12","label":"9/12","revenue":3154.54,"margin":26.115,"profit":823.82},
+{"date":"2026-09-13","label":"9/13","revenue":2969.3,"margin":26.564,"profit":788.77},
+{"date":"2026-09-14","label":"9/14","revenue":3311.9,"margin":26.599,"profit":880.92},
+{"date":"2026-09-15","label":"9/15","revenue":3211.28,"margin":24.865,"profit":798.5},
+{"date":"2026-09-16","label":"9/16","revenue":3172.9,"margin":26.301,"profit":834.51},
+{"date":"2026-09-17","label":"9/17","revenue":3367.98,"margin":24.666,"profit":830.75},
+{"date":"2026-09-18","label":"9/18","revenue":3309.84,"margin":24.691,"profit":817.23},
+{"date":"2026-09-19","label":"9/19","revenue":3531.3,"margin":24.725,"profit":873.11},
+{"date":"2026-09-20","label":"9/20","revenue":3410.89,"margin":28.488,"profit":971.71},
+{"date":"2026-09-21","label":"9/21","revenue":3230.9,"margin":25.6,"profit":827.11},
+{"date":"2026-09-22","label":"9/22","revenue":2680.57,"margin":24.14,"profit":647.1},
+{"date":"2026-09-23","label":"9/23","revenue":2562.4,"margin":23.35,"profit":598.31},
+{"date":"2026-09-24","label":"9/24","revenue":2827.23,"margin":24.519,"profit":693.2},
+{"date":"2026-09-25","label":"9/25","revenue":2717.21,"margin":24.24,"profit":658.65},
+{"date":"2026-09-26","label":"9/26","revenue":2494.4,"margin":24.457,"profit":610.05},
+{"date":"2026-09-27","label":"9/27","revenue":2493.55,"margin":24.636,"profit":614.3},
+{"date":"2026-09-28","label":"9/28","revenue":2933.19,"margin":25.419,"profit":745.6},
+{"date":"2026-09-29","label":"9/29","revenue":3285.82,"margin":25.247,"profit":829.57},
+{"date":"2026-09-30","label":"9/30","revenue":2646.24,"margin":25.049,"profit":662.85}
+];
+    const thresholdDates = new Set(["2026-09-01", "2026-09-02", "2026-09-07", "2026-09-08", "2026-09-19", "2026-09-20", "2026-09-27", "2026-09-29"]);
+    const thresholdLabels = {
+      "2026-09-01":"全月最低",
+      "2026-09-02":"首次突破 $2,500",
+      "2026-09-07":"首次突破 $3,000",
+      "2026-09-08":"全月最高",
+      "2026-09-19":"首次突破 $3,500",
+      "2026-09-20":"毛利最高",
+      "2026-09-27":"月末低点",
+      "2026-09-29":"月末反弹"
+    };
+    const colors = {
+      ink: "#17212b",
+      muted: "#617080",
+      grid: "#dde5ec",
+      axis: "#7d8a96",
+      blue: "#2f6fed",
+      green: "#10a37f",
+      amber: "#f2a900",
+      profit: "#d14c32"
+    };
+    const svg = document.getElementById("chart");
+    const box = document.getElementById("chartBox");
+    const tooltip = document.getElementById("tooltip");
+
+    function money(val) { return Number(val).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+    function shortMoney(val) { return Number(val).toLocaleString("en-US",{maximumFractionDigits:0}); }
+    function create(tag, attrs, parent) {
+      parent = parent || svg;
+      const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+      parent.appendChild(el);
+      return el;
+    }
+    function linePath(points) {
+      return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+    }
+
+    function render() {
+      svg.innerHTML = "";
+      const rect = box.getBoundingClientRect();
+      const width = Math.max(1100, rect.width);
+      const height = Math.max(560, rect.height);
+      const pad = { left: 82, right: 34, top: 34, bottom: 72 };
+      const cw = width - pad.left - pad.right;
+      const ch = height - pad.top - pad.bottom;
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+      const yMax = Math.ceil(Math.max(...data.map(d => d.revenue)) / 500) * 500;
+      const t0 = new Date(data[0].date);
+      const t1 = new Date(data[data.length - 1].date);
+      const x = d => pad.left + ((new Date(d.date) - t0) / (t1 - t0)) * cw;
+      const y = v => pad.top + ch - (v / yMax) * ch;
+
+      for (let v = 0; v <= yMax; v += yMax / 5) {
+        const yy = y(v);
+        create("line", { x1: pad.left, y1: yy, x2: width - pad.right, y2: yy, stroke: colors.grid, "stroke-width": 1 });
+        create("text", { x: pad.left - 14, y: yy + 5, "text-anchor": "end", fill: colors.muted, "font-size": 14 }).textContent = shortMoney(v);
+      }
+      create("line", { x1: pad.left, y1: pad.top, x2: pad.left, y2: height - pad.bottom, stroke: colors.axis, "stroke-width": 1.5 });
+      create("line", { x1: pad.left, y1: height - pad.bottom, x2: width - pad.right, y2: height - pad.bottom, stroke: colors.axis, "stroke-width": 1.5 });
+
+      const revPts = data.map(d => ({ ...d, x: x(d), y: y(d.revenue) }));
+      const prfPts = data.map(d => ({ ...d, x: x(d), y: y(d.profit) }));
+
+      create("path", { d: linePath(revPts), fill: "none", stroke: colors.blue, "stroke-width": 3, "stroke-linejoin": "round" });
+      create("path", { d: linePath(prfPts), fill: "none", stroke: colors.profit, "stroke-width": 3, "stroke-linejoin": "round" });
+
+      // X轴刻度
+      const tickEvery = 7;
+      data.forEach((d, i) => {
+        if (i % tickEvery !== 0 && i !== data.length - 1) return;
+        const xx = x(d);
+        create("line", { x1: xx, y1: height - pad.bottom, x2: xx, y2: height - pad.bottom + 7, stroke: colors.axis });
+        create("text", { x: xx, y: height - pad.bottom + 28, "text-anchor": "middle", fill: colors.ink, "font-size": 14 }).textContent = d.label;
+      });
+
+      create("text", { x: 24, y: pad.top + ch / 2, fill: colors.muted, "font-size": 15 }).textContent = "USD";
+      create("text", { x: pad.left + cw / 2, y: height - 20, "text-anchor": "middle", fill: colors.muted, "font-size": 15 }).textContent = "日期";
+
+      // Revenue散点
+      revPts.forEach(p => {
+        const isTh = thresholdDates.has(p.date);
+        create("circle", { cx: p.x, cy: p.y, r: isTh ? 6 : 3, fill: isTh ? colors.amber : colors.green, stroke: "#fff", "stroke-width": isTh ? 2 : 0 });
+      });
+      // Profit散点
+      prfPts.forEach(p => {
+        create("circle", { cx: p.x, cy: p.y, r: 2.4, fill: colors.profit });
+      });
+
+      // 突破节点标注
+      const occupied = [];
+      const overlaps = (a, b) => !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+      revPts.filter(p => thresholdDates.has(p.date)).forEach(p => {
+        const tag = thresholdLabels[p.date] || "";
+        const l1 = `${p.label}  Rev ${shortMoney(p.revenue)}`;
+        const l2 = `毛利 ${shortMoney(p.profit)}`;
+        const lw = Math.max(148, Math.max(l1.length, l2.length, tag.length) * 8 + 18);
+        const lh = 58;
+        const tries = [
+          { dx: -lw - 12, dy: -58 }, { dx: 12, dy: -58 },
+          { dx: -lw - 12, dy: 10 }, { dx: 12, dy: 10 },
+          { dx: -lw / 2, dy: -76 }, { dx: -lw / 2, dy: 26 }
+        ];
+        let b = null;
+        for (const t of tries) {
+          const prop = {
+            x: Math.max(pad.left, Math.min(width - pad.right - lw, p.x + t.dx)),
+            y: Math.max(pad.top + 6, Math.min(height - pad.bottom - lh - 8, p.y + t.dy)),
+            w: lw, h: lh
+          };
+          if (!occupied.some(e => overlaps(prop, e))) { b = prop; break; }
+        }
+        if (!b) {
+          b = {
+            x: Math.max(pad.left, Math.min(width - pad.right - lw, p.x - lw / 2)),
+            y: Math.max(pad.top + 6, Math.min(height - pad.bottom - lh - 8, p.y - 58)),
+            w: lw, h: lh
+          };
+        }
+        occupied.push(b);
+        const ax = Math.max(b.x, Math.min(b.x + b.w, p.x));
+        const ay = p.y > b.y + b.h ? b.y + b.h : b.y;
+        create("line", { x1: p.x, y1: p.y, x2: ax, y2: ay, stroke: colors.amber, "stroke-width": 1 });
+        create("rect", { x: b.x, y: b.y, width: b.w, height: b.h, rx: 6, fill: "#fff", stroke: colors.grid, "stroke-width": 1 });
+        create("text", { x: b.x + 9, y: b.y + 17, fill: colors.ink, "font-size": 13, "font-weight": 700 }).textContent = l1;
+        create("text", { x: b.x + 9, y: b.y + 34, fill: colors.profit, "font-size": 13, "font-weight": 700 }).textContent = l2;
+        if (tag) {
+          create("text", { x: b.x + 9, y: b.y + 51, fill: colors.amber, "font-size": 13, "font-weight": 700 }).textContent = tag;
+        }
+      });
+
+      // 悬停交互
+      let guide = null;
+      revPts.forEach((p, i) => {
+        const hitW = Math.max(10, cw / data.length);
+        const hit = create("rect", { x: p.x - hitW / 2, y: pad.top, width: hitW, height: ch, fill: "transparent", style: "cursor:crosshair" });
+        const show = () => {
+          if (guide) guide.remove();
+          guide = create("line", { x1: p.x, y1: pad.top, x2: p.x, y2: height - pad.bottom, stroke: colors.axis, "stroke-width": 1, "stroke-dasharray": "4 4", opacity: 0.8 });
+          tooltip.style.display = "block";
+          tooltip.innerHTML = `<div class="date">${p.date}</div><div class="rev">Revenue：${money(p.revenue)}</div><div>Margin%：${p.margin.toFixed(3)}%</div><div class="profit">毛利：${money(p.profit)}</div>`;
+        };
+        const move = e => {
+          show();
+          const bnds = box.getBoundingClientRect();
+          let left = e.clientX - bnds.left + 16;
+          let top = e.clientY - bnds.top - tooltip.offsetHeight - 14;
+          if (left + tooltip.offsetWidth > bnds.width) left = e.clientX - bnds.left - tooltip.offsetWidth - 16;
+          if (top < 0) top = e.clientY - bnds.top + 18;
+          tooltip.style.left = left + "px";
+          tooltip.style.top = top + "px";
+        };
+        const hide = () => { tooltip.style.display = "none"; if (guide) { guide.remove(); guide = null; } };
+        hit.addEventListener("mouseenter", show);
+        hit.addEventListener("mousemove", move);
+        hit.addEventListener("mouseleave", hide);
+      });
+    }
+
+    render();
+    window.addEventListener("resize", render);
+  </script>
+</body>
+</html>
