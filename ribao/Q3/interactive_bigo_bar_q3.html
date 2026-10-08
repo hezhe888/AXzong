@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BIGO 投放柱状图（Q3）</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #617080;
+      --grid: #dde5ec;
+      --blue: #2f6fed;
+      --green: #10a37f;
+      --amber: #f2a900;
+      --bg: #ffffff;
+      --panel: #f5f7fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--panel);
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+    }
+    .wrap {
+      width: min(1680px, calc(100vw - 32px));
+      margin: 24px auto;
+      background: var(--bg);
+      border: 1px solid #e5ebf2;
+      border-radius: 8px;
+      padding: 28px 30px 26px;
+      box-shadow: 0 10px 30px rgba(23, 33, 43, 0.07);
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 16px;
+      margin-top: 6px;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(132px, 1fr));
+      gap: 12px;
+      min-width: 470px;
+    }
+    .kpi {
+      border: 1px solid #e3eaf1;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fbfcfe;
+    }
+    .kpi .label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .kpi .value {
+      font-size: 21px;
+      font-weight: 700;
+      margin-top: 4px;
+      white-space: nowrap;
+    }
+    .chart-card {
+      position: relative;
+      border: 1px solid #e3eaf1;
+      border-radius: 8px;
+      background: #fff;
+      padding: 16px 16px 10px;
+    }
+    svg {
+      width: 100%;
+      height: 760px;
+      display: block;
+    }
+    .hover {
+      cursor: crosshair;
+    }
+    .tooltip {
+      position: absolute;
+      display: none;
+      pointer-events: none;
+      min-width: 210px;
+      padding: 11px 13px;
+      border: 1px solid #d8e1eb;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 8px 24px rgba(23, 33, 43, 0.16);
+      font-size: 14px;
+      line-height: 1.55;
+      z-index: 5;
+    }
+    .tooltip .date {
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .legend {
+      display: flex;
+      gap: 22px;
+      margin: 12px 0 0 90px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .swatch {
+      width: 28px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    @media (max-width: 980px) {
+      header { display: block; }
+      .kpis { min-width: 0; margin-top: 16px; }
+      svg { height: 680px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div>
+        <h1>BIGO 投放柱状图</h1>
+        <div class="sub">2026 Q3（7-9月）；每日 bigo 花费与 Revenue 并列柱状图，ROI 单独放在下方趋势区；悬停查看当天明细。</div>
+      </div>
+      <section class="kpis">
+        <div class="kpi"><div class="label">总花费</div><div id="totalSpend" class="value"></div></div>
+        <div class="kpi"><div class="label">总 Revenue</div><div id="totalRevenue" class="value"></div></div>
+        <div class="kpi"><div class="label">总 ROI</div><div id="totalRoi" class="value"></div></div>
+      </section>
+    </header>
+    <section id="chartCard" class="chart-card">
+      <svg id="chart" role="img" aria-label="BIGO 投放柱状图与 ROI 趋势"></svg>
+      <div id="tooltip" class="tooltip"></div>
+      <div class="legend">
+        <span><i class="swatch" style="background: var(--blue)"></i>bigo 花费</span>
+        <span><i class="swatch" style="background: var(--green)"></i>Revenue</span>
+        <span><i class="swatch" style="background: var(--amber)"></i>ROI</span>
+      </div>
+    </section>
+  </main>
+  <script>
+    const data = [{"date": "2026-07-01", "label": "7/1", "spend": 203.44, "revenue": 224.32, "roi": 1.1026}, {"date": "2026-07-02", "label": "7/2", "spend": 128.12, "revenue": 136.57, "roi": 1.066}, {"date": "2026-07-03", "label": "7/3", "spend": 33.69, "revenue": 34.83, "roi": 1.0338}, {"date": "2026-07-04", "label": "7/4", "spend": 110.92, "revenue": 125.2, "roi": 1.1287}, {"date": "2026-07-05", "label": "7/5", "spend": 120.37, "revenue": 137.41, "roi": 1.1416}, {"date": "2026-07-06", "label": "7/6", "spend": 97.5, "revenue": 109.79, "roi": 1.1261}, {"date": "2026-07-07", "label": "7/7", "spend": 47.27, "revenue": 53.91, "roi": 1.1405}, {"date": "2026-07-08", "label": "7/8", "spend": 54.09, "revenue": 60.59, "roi": 1.1202}, {"date": "2026-07-09", "label": "7/9", "spend": 64.63, "revenue": 75.97, "roi": 1.1755}, {"date": "2026-07-10", "label": "7/10", "spend": 41.86, "revenue": 49.6, "roi": 1.1849}, {"date": "2026-07-11", "label": "7/11", "spend": 51.03, "revenue": 57.9, "roi": 1.1346}, {"date": "2026-07-12", "label": "7/12", "spend": 61.02, "revenue": 67.72, "roi": 1.1098}, {"date": "2026-07-13", "label": "7/13", "spend": 69.27, "revenue": 75.4, "roi": 1.0885}, {"date": "2026-07-14", "label": "7/14", "spend": 55.7, "revenue": 60.49, "roi": 1.086}, {"date": "2026-07-15", "label": "7/15", "spend": 64.82, "revenue": 69.42, "roi": 1.071}, {"date": "2026-07-16", "label": "7/16", "spend": 62.88, "revenue": 72.74, "roi": 1.1568}, {"date": "2026-07-17", "label": "7/17", "spend": 61.27, "revenue": 69.55, "roi": 1.1351}, {"date": "2026-07-18", "label": "7/18", "spend": 79.85, "revenue": 90.8, "roi": 1.1371}, {"date": "2026-07-19", "label": "7/19", "spend": 141.79, "revenue": 153.11, "roi": 1.0798}, {"date": "2026-07-20", "label": "7/20", "spend": 123.54, "revenue": 132.57, "roi": 1.0731}, {"date": "2026-07-21", "label": "7/21", "spend": 195.48, "revenue": 209.65, "roi": 1.0725}, {"date": "2026-07-22", "label": "7/22", "spend": 166.57, "revenue": 191.13, "roi": 1.1474}, {"date": "2026-07-23", "label": "7/23", "spend": 342.11, "revenue": 363.41, "roi": 1.0623}, {"date": "2026-07-24", "label": "7/24", "spend": 220.11, "revenue": 239.18, "roi": 1.0866}, {"date": "2026-07-25", "label": "7/25", "spend": 217.35, "revenue": 248.21, "roi": 1.142}, {"date": "2026-07-26", "label": "7/26", "spend": 206.36, "revenue": 224.81, "roi": 1.0894}, {"date": "2026-07-27", "label": "7/27", "spend": 178.13, "revenue": 194.43, "roi": 1.0915}, {"date": "2026-07-28", "label": "7/28", "spend": 78.35, "revenue": 86.67, "roi": 1.1062}, {"date": "2026-07-29", "label": "7/29", "spend": 71.59, "revenue": 87.56, "roi": 1.2231}, {"date": "2026-07-30", "label": "7/30", "spend": 101.89, "revenue": 118.06, "roi": 1.1587}, {"date": "2026-07-31", "label": "7/31", "spend": 102.76, "revenue": 118.78, "roi": 1.1559}, {"date": "2026-08-01", "label": "8/1", "spend": 84.31, "revenue": 98.33, "roi": 1.1663}, {"date": "2026-08-02", "label": "8/2", "spend": 93.11, "revenue": 110.66, "roi": 1.1885}, {"date": "2026-08-03", "label": "8/3", "spend": 186.09, "revenue": 202.39, "roi": 1.0876}, {"date": "2026-08-04", "label": "8/4", "spend": 180.25, "revenue": 197.42, "roi": 1.0953}, {"date": "2026-08-05", "label": "8/5", "spend": 139.24, "revenue": 150.03, "roi": 1.0775}, {"date": "2026-08-06", "label": "8/6", "spend": 76.15, "revenue": 93.48, "roi": 1.2276}, {"date": "2026-08-07", "label": "8/7", "spend": 78.17, "revenue": 100.39, "roi": 1.2843}, {"date": "2026-08-08", "label": "8/8", "spend": 102.19, "revenue": 119.02, "roi": 1.1647}, {"date": "2026-08-09", "label": "8/9", "spend": 98.52, "revenue": 105.59, "roi": 1.0718}, {"date": "2026-08-10", "label": "8/10", "spend": 98.49, "revenue": 107.01, "roi": 1.0865}, {"date": "2026-08-11", "label": "8/11", "spend": 95.24, "revenue": 102.61, "roi": 1.0774}, {"date": "2026-08-12", "label": "8/12", "spend": 49.72, "revenue": 54.81, "roi": 1.1024}, {"date": "2026-08-13", "label": "8/13", "spend": 41.42, "revenue": 48.08, "roi": 1.1608}, {"date": "2026-08-14", "label": "8/14", "spend": 112.49, "revenue": 124.82, "roi": 1.1096}, {"date": "2026-08-15", "label": "8/15", "spend": 103.78, "revenue": 112.44, "roi": 1.0834}, {"date": "2026-08-16", "label": "8/16", "spend": 111.43, "revenue": 120.31, "roi": 1.0797}, {"date": "2026-08-17", "label": "8/17", "spend": 113.9, "revenue": 121.51, "roi": 1.0668}, {"date": "2026-08-18", "label": "8/18", "spend": 108.18, "revenue": 118.66, "roi": 1.0969}, {"date": "2026-08-19", "label": "8/19", "spend": 92.66, "revenue": 99.12, "roi": 1.0697}, {"date": "2026-08-20", "label": "8/20", "spend": 101.75, "revenue": 108.96, "roi": 1.0709}, {"date": "2026-08-21", "label": "8/21", "spend": 80.43, "revenue": 87.39, "roi": 1.0865}, {"date": "2026-08-22", "label": "8/22", "spend": 116.89, "revenue": 126.14, "roi": 1.0791}, {"date": "2026-08-23", "label": "8/23", "spend": 149.82, "revenue": 159.5, "roi": 1.0646}, {"date": "2026-08-24", "label": "8/24", "spend": 166.71, "revenue": 178.12, "roi": 1.0684}, {"date": "2026-08-25", "label": "8/25", "spend": 156.76, "revenue": 165.96, "roi": 1.0587}, {"date": "2026-08-26", "label": "8/26", "spend": 152.2, "revenue": 163.25, "roi": 1.0726}, {"date": "2026-08-27", "label": "8/27", "spend": 57.52, "revenue": 63.61, "roi": 1.1059}, {"date": "2026-08-28", "label": "8/28", "spend": 107.27, "revenue": 116.79, "roi": 1.0887}, {"date": "2026-08-29", "label": "8/29", "spend": 162.03, "revenue": 175.07, "roi": 1.0805}, {"date": "2026-08-30", "label": "8/30", "spend": 204.01, "revenue": 218.6, "roi": 1.0715}, {"date": "2026-08-31", "label": "8/31", "spend": 188.77, "revenue": 202.01, "roi": 1.0701}, {"date": "2026-09-01", "label": "9/1", "spend": 155.05, "revenue": 166.72, "roi": 1.0753}, {"date": "2026-09-02", "label": "9/2", "spend": 222.76, "revenue": 238.34, "roi": 1.0699}, {"date": "2026-09-03", "label": "9/3", "spend": 156.23, "revenue": 171.81, "roi": 1.0997}, {"date": "2026-09-04", "label": "9/4", "spend": 88.41, "revenue": 96.65, "roi": 1.0932}, {"date": "2026-09-05", "label": "9/5", "spend": 77.27, "revenue": 87.98, "roi": 1.1386}, {"date": "2026-09-06", "label": "9/6", "spend": 61.87, "revenue": 71.83, "roi": 1.161}, {"date": "2026-09-07", "label": "9/7", "spend": 35.63, "revenue": 48.42, "roi": 1.359}, {"date": "2026-09-08", "label": "9/8", "spend": 73.37, "revenue": 83.99, "roi": 1.1447}, {"date": "2026-09-09", "label": "9/9", "spend": 70.99, "revenue": 80.43, "roi": 1.133}, {"date": "2026-09-10", "label": "9/10", "spend": 41.28, "revenue": 45.74, "roi": 1.108}, {"date": "2026-09-11", "label": "9/11", "spend": 23.94, "revenue": 27.82, "roi": 1.1621}, {"date": "2026-09-12", "label": "9/12", "spend": 29.13, "revenue": 34.99, "roi": 1.2012}, {"date": "2026-09-13", "label": "9/13", "spend": 31.94, "revenue": 37.63, "roi": 1.1781}, {"date": "2026-09-14", "label": "9/14", "spend": 47.77, "revenue": 53.8, "roi": 1.1262}, {"date": "2026-09-15", "label": "9/15", "spend": 32.8, "revenue": 37.25, "roi": 1.1357}, {"date": "2026-09-16", "label": "9/16", "spend": 9.89, "revenue": 13.12, "roi": 1.3266}, {"date": "2026-09-17", "label": "9/17", "spend": 4.13, "revenue": 7.06, "roi": 1.7094}, {"date": "2026-09-18", "label": "9/18", "spend": 3.3, "revenue": 3.5, "roi": 1.0606}, {"date": "2026-09-19", "label": "9/19", "spend": 15.87, "revenue": 16.73, "roi": 1.0542}, {"date": "2026-09-20", "label": "9/20", "spend": 3.44, "revenue": 3.64, "roi": 1.0581}, {"date": "2026-09-21", "label": "9/21", "spend": 1.06, "revenue": 3.12, "roi": 2.9434}, {"date": "2026-09-22", "label": "9/22", "spend": 1.13, "revenue": 3.19, "roi": 2.823}, {"date": "2026-09-23", "label": "9/23", "spend": 0.73, "revenue": 0.77, "roi": 1.0548}, {"date": "2026-09-24", "label": "9/24", "spend": 30.21, "revenue": 31.99, "roi": 1.0589}, {"date": "2026-09-25", "label": "9/25", "spend": 26.44, "revenue": 27.93, "roi": 1.0564}, {"date": "2026-09-26", "label": "9/26", "spend": 6.02, "revenue": 7.18, "roi": 1.1927}, {"date": "2026-09-27", "label": "9/27", "spend": 8.99, "revenue": 11.1, "roi": 1.2347}, {"date": "2026-09-28", "label": "9/28", "spend": 21.29, "revenue": 23.59, "roi": 1.108}, {"date": "2026-09-29", "label": "9/29", "spend": 24.75, "revenue": 26.99, "roi": 1.0905}, {"date": "2026-09-30", "label": "9/30", "spend": 9.01, "revenue": 9.94, "roi": 1.1032}];
+    const totals = {"spend": 8477.96, "revenue": 9365.11, "roi": 1.104642};
+    const svg = document.getElementById("chart");
+    const card = document.getElementById("chartCard");
+    const tooltip = document.getElementById("tooltip");
+    const colors = {
+      ink: "#17212b",
+      muted: "#617080",
+      grid: "#dde5ec",
+      blue: "#2f6fed",
+      green: "#10a37f",
+      amber: "#f2a900"
+    };
+    function money(value) {
+      return Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function shortMoney(value) {
+      return Number(value).toLocaleString("en-US", { maximumFractionDigits: 0 });
+    }
+    function pct(value) {
+      return `${(Number(value) * 100).toFixed(1)}%`;
+    }
+    function create(tag, attrs = {}, parent = svg) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
+      parent.appendChild(el);
+      return el;
+    }
+    function showTip(event, item) {
+      tooltip.style.display = "block";
+      tooltip.innerHTML = `
+        <div class="date">${item.date}</div>
+        <div style="color:${colors.blue};font-weight:700">bigo 花费：${money(item.spend)}</div>
+        <div style="color:${colors.green};font-weight:700">Revenue：${money(item.revenue)}</div>
+        <div style="color:${colors.amber};font-weight:700">Revenue ROI：${pct(item.roi)}</div>
+      `;
+      moveTip(event);
+    }
+    function moveTip(event) {
+      const bounds = card.getBoundingClientRect();
+      const tipW = tooltip.offsetWidth;
+      const tipH = tooltip.offsetHeight;
+      let left = event.clientX - bounds.left + 16;
+      let top = event.clientY - bounds.top - tipH - 14;
+      if (left + tipW > bounds.width) left = event.clientX - bounds.left - tipW - 16;
+      if (top < 0) top = event.clientY - bounds.top + 18;
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+    }
+    function hideTip() {
+      tooltip.style.display = "none";
+    }
+    function linePath(points) {
+      return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+    }
+    function render() {
+      document.getElementById("totalSpend").textContent = money(totals.spend);
+      document.getElementById("totalRevenue").textContent = money(totals.revenue);
+      document.getElementById("totalRoi").textContent = pct(totals.roi);
+      svg.innerHTML = "";
+
+      const width = 2600;
+      const height = 760;
+      const left = 76;
+      const right = 84;
+      const top = 36;
+      const barPlotH = 420;
+      const gap = 62;
+      const roiTop = top + barPlotH + gap;
+      const roiPlotH = 150;
+      const bottom = 72;
+      const plotW = width - left - right;
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+      const maxValue = Math.ceil(Math.max(...data.flatMap(d => [d.spend, d.revenue])) / 50) * 50;
+      const maxRoi = Math.max(2, Math.ceil(Math.max(...data.map(d => d.roi)) * 10) / 10);
+      const groupW = plotW / data.length;
+      const barW = Math.max(6, groupW * 0.32);
+      const y = value => top + barPlotH - value / maxValue * barPlotH;
+      const yRoi = value => roiTop + roiPlotH - value / maxRoi * roiPlotH;
+
+      for (let i = 0; i <= 5; i++) {
+        const value = maxValue * i / 5;
+        const yy = y(value);
+        create("line", { x1: left, y1: yy, x2: width - right, y2: yy, stroke: colors.grid, "stroke-width": 1 });
+        create("text", { x: left - 12, y: yy + 5, "text-anchor": "end", fill: colors.muted, "font-size": 13 }).textContent = shortMoney(value);
+      }
+      create("text", { x: left, y: top - 14, fill: colors.muted, "font-size": 14, "font-weight": 700 }).textContent = "花费 / Revenue";
+
+      for (let i = 0; i <= 4; i++) {
+        const value = maxRoi * i / 4;
+        const yy = yRoi(value);
+        create("line", { x1: left, y1: yy, x2: width - right, y2: yy, stroke: colors.grid, "stroke-width": 1 });
+        create("text", { x: left - 12, y: yy + 5, "text-anchor": "end", fill: colors.muted, "font-size": 12 }).textContent = pct(value);
+      }
+      create("text", { x: left, y: roiTop - 16, fill: colors.amber, "font-size": 14, "font-weight": 700 }).textContent = "Revenue ROI";
+
+      const roiPoints = [];
+      data.forEach((item, index) => {
+        const cx = left + index * groupW + groupW / 2;
+        const spendH = barPlotH - (y(item.spend) - top);
+        const revenueH = barPlotH - (y(item.revenue) - top);
+        create("rect", { x: cx - barW - 2, y: y(item.spend), width: barW, height: spendH, rx: 4, fill: colors.blue });
+        create("rect", { x: cx + 2, y: y(item.revenue), width: barW, height: revenueH, rx: 4, fill: colors.green });
+        const point = { x: cx, y: yRoi(item.roi), item };
+        roiPoints.push(point);
+        if (index % 7 === 0 || index === data.length - 1) {
+          create("text", { x: cx, y: height - 34, "text-anchor": "middle", fill: colors.ink, "font-size": 13 }).textContent = item.label;
+        }
+        const hit = create("rect", { x: cx - groupW / 2, y: top, width: groupW, height: roiTop + roiPlotH - top, fill: "transparent", class: "hover" });
+        hit.addEventListener("mouseenter", event => showTip(event, item));
+        hit.addEventListener("mousemove", event => moveTip(event));
+        hit.addEventListener("mouseleave", hideTip);
+      });
+
+      create("path", { d: linePath(roiPoints), fill: "none", stroke: colors.amber, "stroke-width": 3, "stroke-linejoin": "round" });
+      roiPoints.forEach(p => create("circle", { cx: p.x, cy: p.y, r: 4, fill: colors.amber, stroke: "#fff", "stroke-width": 2 }));
+      create("text", { x: left + plotW / 2, y: height - 8, "text-anchor": "middle", fill: colors.muted, "font-size": 14 }).textContent = "日期";
+      create("text", { x: 18, y: top + barPlotH / 2, fill: colors.muted, "font-size": 14 }).textContent = "金额";
+    }
+    render();
+  </script>
+</body>
+</html>
