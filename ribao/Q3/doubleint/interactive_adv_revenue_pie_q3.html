@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ADV Revenue 饼图 & 毛利（Q3）</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #617080;
+      --grid: #dde5ec;
+      --blue: #2f6fed;
+      --profit: #d14c32;
+      --bg: #ffffff;
+      --panel: #f5f7fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--panel);
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+    }
+    .wrap {
+      width: min(1740px, calc(100vw - 32px));
+      margin: 24px auto;
+      background: var(--bg);
+      border: 1px solid #e5ebf2;
+      border-radius: 8px;
+      padding: 28px 30px 26px;
+      box-shadow: 0 10px 30px rgba(23, 33, 43, 0.07);
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+    .sub {
+      color: var(--muted);
+      font-size: 16px;
+      margin-top: 6px;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(132px, 1fr));
+      gap: 12px;
+      min-width: 470px;
+    }
+    .kpi {
+      border: 1px solid #e3eaf1;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fbfcfe;
+    }
+    .kpi .label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .kpi .value {
+      font-size: 21px;
+      font-weight: 700;
+      margin-top: 4px;
+      white-space: nowrap;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(680px, 1.15fr) minmax(480px, 0.85fr);
+      gap: 26px;
+      align-items: stretch;
+    }
+    .chart-card {
+      position: relative;
+      min-height: 720px;
+      border: 1px solid #e3eaf1;
+      border-radius: 8px;
+      background: #fff;
+      overflow: hidden;
+    }
+    svg {
+      width: 100%;
+      height: 100%;
+      min-height: 720px;
+      display: block;
+    }
+    .slice {
+      cursor: pointer;
+      transition: opacity 140ms ease, transform 140ms ease;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    .slice:hover, .slice.active {
+      opacity: 0.86;
+      transform: scale(1.012);
+    }
+    .tooltip {
+      position: absolute;
+      display: none;
+      pointer-events: none;
+      min-width: 230px;
+      padding: 11px 13px;
+      border: 1px solid #d8e1eb;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 8px 24px rgba(23, 33, 43, 0.16);
+      font-size: 14px;
+      line-height: 1.55;
+      z-index: 5;
+    }
+    .tooltip .name {
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .tooltip .rev { color: var(--blue); font-weight: 700; }
+    .tooltip .profit { color: var(--profit); font-weight: 700; }
+    .side {
+      min-height: 720px;
+      border: 1px solid #e3eaf1;
+      border-radius: 8px;
+      background: #fff;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
+    }
+    .selected {
+      padding: 18px 18px 16px;
+      border-bottom: 1px solid #e3eaf1;
+      background: #fbfcfe;
+    }
+    .selected h2 {
+      margin: 0 0 10px;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .metric {
+      border: 1px solid #e3eaf1;
+      border-radius: 8px;
+      padding: 9px 10px;
+      background: #fff;
+    }
+    .metric .label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .metric .value {
+      font-weight: 700;
+      margin-top: 3px;
+      white-space: nowrap;
+    }
+    .table-wrap {
+      overflow: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #edf2f6;
+      text-align: right;
+      white-space: nowrap;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background: #fff;
+      color: var(--muted);
+      font-weight: 700;
+      z-index: 1;
+    }
+    th:first-child, td:first-child {
+      text-align: left;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    tr {
+      cursor: pointer;
+    }
+    tbody tr:hover, tbody tr.active {
+      background: #f5f8fc;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @media (max-width: 1100px) {
+      header { display: block; }
+      .kpis { min-width: 0; margin-top: 16px; }
+      .layout { grid-template-columns: 1fr; }
+      .chart-card, .side { min-height: 620px; }
+      svg { min-height: 620px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div>
+        <h1>ADV Revenue 饼图 & 毛利</h1>
+        <div class="sub">2026 Q3（7-9月）；饼图按 Revenue 占比绘制；悬停或点击切片查看 Revenue、Payout、毛利和毛利率</div>
+      </div>
+      <section class="kpis">
+        <div class="kpi"><div class="label">Total Revenue</div><div id="totalRevenue" class="value"></div></div>
+        <div class="kpi"><div class="label">Total 毛利</div><div id="totalProfit" class="value"></div></div>
+        <div class="kpi"><div class="label">毛利率</div><div id="totalMargin" class="value"></div></div>
+      </section>
+    </header>
+    <section class="layout">
+      <div id="chartCard" class="chart-card">
+        <svg id="pie" role="img" aria-label="ADV Revenue 交互饼图"></svg>
+        <div id="tooltip" class="tooltip"></div>
+      </div>
+      <aside class="side">
+        <div class="selected">
+          <h2 id="selectedName">全部 ADV</h2>
+          <div class="metrics">
+            <div class="metric"><div class="label">Revenue</div><div id="selectedRevenue" class="value"></div></div>
+            <div class="metric"><div class="label">占比</div><div id="selectedShare" class="value"></div></div>
+            <div class="metric"><div class="label">毛利</div><div id="selectedProfit" class="value"></div></div>
+            <div class="metric"><div class="label">毛利率</div><div id="selectedMargin" class="value"></div></div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Advertiser</th><th>Revenue</th><th>毛利</th><th>占比</th></tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </aside>
+    </section>
+  </main>
+  <script>
+    const data = [{"adv": "Appnext", "revenue": 87128.8, "payout": 65572.03, "profit": 21556.77, "share": 0.372495, "margin": 0.247413}, {"adv": "130009-flymobi", "revenue": 51588.5, "payout": 37807.51, "profit": 13780.99, "share": 0.220552, "margin": 0.267133}, {"adv": "130026-Melodong", "revenue": 16187.8, "payout": 12150.58, "profit": 4037.22, "share": 0.069206, "margin": 0.249399}, {"adv": "130012-imx bidding", "revenue": 9612.49, "payout": 7220.15, "profit": 2392.34, "share": 0.041096, "margin": 0.248878}, {"adv": "130001-Leapmob", "revenue": 8855.15, "payout": 6642.45, "profit": 2212.7, "share": 0.037858, "margin": 0.249877}, {"adv": "130015-Viking", "revenue": 6896.94, "payout": 5188.3, "profit": 1708.64, "share": 0.029486, "margin": 0.247739}, {"adv": "130003-acshare", "revenue": 6378.93, "payout": 4995.51, "profit": 1383.42, "share": 0.027271, "margin": 0.216873}, {"adv": "130004-hopemobi", "revenue": 5029.65, "payout": 3587.82, "profit": 1441.83, "share": 0.021503, "margin": 0.286666}, {"adv": "130025-skyworker", "revenue": 5007.1, "payout": 3917.36, "profit": 1089.74, "share": 0.021406, "margin": 0.217639}, {"adv": "130013-bytemobi", "revenue": 4888.45, "payout": 3795.19, "profit": 1093.26, "share": 0.020899, "margin": 0.223641}, {"adv": "130006-mejoy", "revenue": 4583.74, "payout": 3485.05, "profit": 1098.69, "share": 0.019596, "margin": 0.239693}, {"adv": "130017-starfish", "revenue": 4176.61, "payout": 2971.43, "profit": 1205.18, "share": 0.017856, "margin": 0.288555}, {"adv": "130029-synjoy", "revenue": 4109.81, "payout": 3199.71, "profit": 910.1, "share": 0.01757, "margin": 0.221446}, {"adv": "130020-Orchidvalley", "revenue": 2933.24, "payout": 2221.32, "profit": 711.92, "share": 0.01254, "margin": 0.242708}, {"adv": "130030-bid", "revenue": 2703.25, "payout": 2106.77, "profit": 596.48, "share": 0.011557, "margin": 0.220653}, {"adv": "130021-Zhizhen", "revenue": 2205.33, "payout": 1684.18, "profit": 521.15, "share": 0.009428, "margin": 0.236314}, {"adv": "130018-Pando", "revenue": 2088.67, "payout": 1485.83, "profit": 602.84, "share": 0.00893, "margin": 0.288624}, {"adv": "130022-Boostcode", "revenue": 2045.92, "payout": 1511.81, "profit": 534.11, "share": 0.008747, "margin": 0.261061}, {"adv": "130037-FarmingFamily", "revenue": 1489.14, "payout": 1147.95, "profit": 341.19, "share": 0.006366, "margin": 0.229119}, {"adv": "130027-goodjoyads", "revenue": 1290.7, "payout": 1002.59, "profit": 288.11, "share": 0.005518, "margin": 0.22322}, {"adv": "130019-LunaLabs", "revenue": 1162.48, "payout": 918.3, "profit": 244.18, "share": 0.00497, "margin": 0.210051}, {"adv": "137007-Apkpure", "revenue": 879.14, "payout": 707.17, "profit": 171.97, "share": 0.003759, "margin": 0.195612}, {"adv": "130008-Hive ADS", "revenue": 678.89, "payout": 530.44, "profit": 148.45, "share": 0.002902, "margin": 0.218666}, {"adv": "130028-Quarklio", "revenue": 663.04, "payout": 505.45, "profit": 157.59, "share": 0.002835, "margin": 0.237678}, {"adv": "137008-youmi", "revenue": 534.0, "payout": 420.39, "profit": 113.61, "share": 0.002283, "margin": 0.212753}, {"adv": "130035-aXhare", "revenue": 408.83, "payout": 325.9, "profit": 82.93, "share": 0.001748, "margin": 0.202847}, {"adv": "130016-volosonic", "revenue": 306.29, "payout": 230.75, "profit": 75.54, "share": 0.001309, "margin": 0.246629}, {"adv": "137003-altosum", "revenue": 73.25, "payout": 68.6, "profit": 4.65, "share": 0.000313, "margin": 0.063481}];
+    const totals = {"revenue": 233906.14, "payout": 175400.54, "profit": 58505.6, "margin": 0.250124};
+    const palette = [
+      "#2f6fed", "#10a37f", "#f2a900", "#d14c32", "#6f58d9", "#00a6a6",
+      "#8b6f47", "#e06f2f", "#496a81", "#c0447d", "#6a994e", "#7b8fa1",
+      "#a65fbe", "#cf8f2e", "#2d9cdb", "#607d3b", "#b55252", "#4b65aa",
+      "#8d7bd3", "#7a8b2e", "#ba6a8f", "#607080"
+    ];
+    const svg = document.getElementById("pie");
+    const card = document.getElementById("chartCard");
+    const tooltip = document.getElementById("tooltip");
+    const rows = document.getElementById("rows");
+    let activeAdv = null;
+
+    function money(value) {
+      return Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function shortMoney(value) {
+      return Number(value).toLocaleString("en-US", { maximumFractionDigits: 0 });
+    }
+    function pct(value) {
+      return `${(Number(value) * 100).toFixed(1)}%`;
+    }
+    function create(tag, attrs = {}, parent = svg) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
+      parent.appendChild(el);
+      return el;
+    }
+    function polar(cx, cy, radius, angle) {
+      return {
+        x: cx + radius * Math.cos(angle),
+        y: cy + radius * Math.sin(angle)
+      };
+    }
+    function arcPath(cx, cy, outerR, innerR, start, end) {
+      const large = end - start > Math.PI ? 1 : 0;
+      const p1 = polar(cx, cy, outerR, start);
+      const p2 = polar(cx, cy, outerR, end);
+      const p3 = polar(cx, cy, innerR, end);
+      const p4 = polar(cx, cy, innerR, start);
+      return [
+        `M ${p1.x} ${p1.y}`,
+        `A ${outerR} ${outerR} 0 ${large} 1 ${p2.x} ${p2.y}`,
+        `L ${p3.x} ${p3.y}`,
+        `A ${innerR} ${innerR} 0 ${large} 0 ${p4.x} ${p4.y}`,
+        "Z"
+      ].join(" ");
+    }
+    function setTotals() {
+      document.getElementById("totalRevenue").textContent = money(totals.revenue);
+      document.getElementById("totalProfit").textContent = money(totals.profit);
+      document.getElementById("totalMargin").textContent = pct(totals.margin);
+    }
+    function setSelected(item) {
+      activeAdv = item?.adv || null;
+      document.getElementById("selectedName").textContent = item ? item.adv : "全部 ADV";
+      document.getElementById("selectedRevenue").textContent = item ? money(item.revenue) : money(totals.revenue);
+      document.getElementById("selectedShare").textContent = item ? pct(item.share) : "100.0%";
+      document.getElementById("selectedProfit").textContent = item ? money(item.profit) : money(totals.profit);
+      document.getElementById("selectedMargin").textContent = item ? pct(item.margin) : pct(totals.margin);
+      document.querySelectorAll(".slice").forEach(el => el.classList.toggle("active", el.dataset.adv === activeAdv));
+      document.querySelectorAll("tbody tr").forEach(el => el.classList.toggle("active", el.dataset.adv === activeAdv));
+    }
+    function showTip(event, item) {
+      tooltip.style.display = "block";
+      tooltip.innerHTML = `
+        <div class="name">${item.adv}</div>
+        <div class="rev">Revenue：${money(item.revenue)}（${pct(item.share)}）</div>
+        <div>Payout：${money(item.payout)}</div>
+        <div class="profit">毛利：${money(item.profit)}（毛利率 ${pct(item.margin)}）</div>
+      `;
+      moveTip(event);
+    }
+    function moveTip(event) {
+      const bounds = card.getBoundingClientRect();
+      const tipW = tooltip.offsetWidth;
+      const tipH = tooltip.offsetHeight;
+      let left = event.clientX - bounds.left + 16;
+      let top = event.clientY - bounds.top - tipH - 14;
+      if (left + tipW > bounds.width) left = event.clientX - bounds.left - tipW - 16;
+      if (top < 0) top = event.clientY - bounds.top + 18;
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+    }
+    function hideTip() {
+      tooltip.style.display = "none";
+    }
+    function renderRows() {
+      rows.innerHTML = "";
+      data.forEach((item, index) => {
+        const tr = document.createElement("tr");
+        tr.dataset.adv = item.adv;
+        tr.innerHTML = `
+          <td title="${item.adv}"><span class="dot" style="background:${palette[index % palette.length]}"></span>${item.adv}</td>
+          <td>${shortMoney(item.revenue)}</td>
+          <td>${shortMoney(item.profit)}</td>
+          <td>${pct(item.share)}</td>
+        `;
+        tr.addEventListener("mouseenter", () => setSelected(item));
+        tr.addEventListener("click", () => setSelected(item));
+        rows.appendChild(tr);
+      });
+    }
+    function renderPie() {
+      svg.innerHTML = "";
+      const rect = card.getBoundingClientRect();
+      const width = Math.max(680, rect.width);
+      const height = Math.max(640, rect.height);
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      const cx = width / 2;
+      const cy = height / 2 + 8;
+      const outerR = Math.min(width, height) * 0.38;
+      const innerR = outerR * 0.55;
+      let angle = -Math.PI / 2;
+      const totalRevenue = totals.revenue;
+
+      data.forEach((item, index) => {
+        const sliceAngle = (item.revenue / totalRevenue) * Math.PI * 2;
+        const start = angle;
+        const end = angle + sliceAngle;
+        const path = create("path", {
+          d: arcPath(cx, cy, outerR, innerR, start, end),
+          fill: palette[index % palette.length],
+          stroke: "#ffffff",
+          "stroke-width": 2,
+          class: "slice",
+          "data-adv": item.adv
+        });
+        path.addEventListener("mouseenter", event => {
+          setSelected(item);
+          showTip(event, item);
+        });
+        path.addEventListener("mousemove", event => moveTip(event));
+        path.addEventListener("mouseleave", hideTip);
+        path.addEventListener("click", () => setSelected(item));
+
+        if (item.share >= 0.035) {
+          const mid = start + sliceAngle / 2;
+          const labelPoint = polar(cx, cy, outerR + 24, mid);
+          create("text", {
+            x: labelPoint.x,
+            y: labelPoint.y,
+            "text-anchor": labelPoint.x >= cx ? "start" : "end",
+            fill: "#17212b",
+            "font-size": 13,
+            "font-weight": 700
+          }).textContent = `${item.adv.replace(/^\d+-?/, "")} ${pct(item.share)}`;
+        }
+        angle = end;
+      });
+
+      create("circle", { cx, cy, r: innerR - 4, fill: "#ffffff" });
+      create("text", { x: cx, y: cy - 18, "text-anchor": "middle", fill: "#617080", "font-size": 16 }).textContent = "Total Revenue";
+      create("text", { x: cx, y: cy + 10, "text-anchor": "middle", fill: "#17212b", "font-size": 28, "font-weight": 800 }).textContent = shortMoney(totals.revenue);
+      create("text", { x: cx, y: cy + 38, "text-anchor": "middle", fill: "#d14c32", "font-size": 16, "font-weight": 700 }).textContent = `毛利 ${shortMoney(totals.profit)}`;
+    }
+
+    setTotals();
+    setSelected(null);
+    renderRows();
+    renderPie();
+    window.addEventListener("resize", renderPie);
+  </script>
+</body>
+</html>
