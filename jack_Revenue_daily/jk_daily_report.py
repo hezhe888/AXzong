@@ -47,10 +47,18 @@ MAX_RETRIES = 3
 def load_pub_mapping():
     raw = os.environ['PUB_MAPPING']
     mapping = json.loads(raw)
-    jk_mids = [k for k, v in mapping.items() if 'jk' in v.lower()]
+    normalized = {}
+    for k, v in mapping.items():
+        if isinstance(v, str):
+            normalized[k] = v
+        elif isinstance(v, dict):
+            normalized[k] = v.get('name', '') or v.get('pub_name', '')
+        else:
+            normalized[k] = str(v)
+    jk_mids = [k for k, v in normalized.items() if 'jk' in v.lower()]
     if not jk_mids:
         raise ValueError("No JK pubs found in PUB_MAPPING")
-    return mapping, jk_mids
+    return normalized, jk_mids
 
 
 def get_yesterday_date():

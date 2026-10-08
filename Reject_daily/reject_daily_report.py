@@ -99,7 +99,16 @@ def _cjk_pad(s, width, align='L'):
 def load_pub_mapping():
     if 'PUB_MAPPING' not in os.environ or not os.environ['PUB_MAPPING']:
         return {}
-    return json.loads(os.environ['PUB_MAPPING'])
+    mapping = json.loads(os.environ['PUB_MAPPING'])
+    normalized = {}
+    for k, v in mapping.items():
+        if isinstance(v, str):
+            normalized[k] = v
+        elif isinstance(v, dict):
+            normalized[k] = v.get('name', '') or v.get('pub_name', '')
+        else:
+            normalized[k] = str(v)
+    return normalized
 
 
 def get_dates(args):
