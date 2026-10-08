@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>日维度 Revenue & 毛利（aXhare）</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #617080;
+      --grid: #dde5ec;
+      --axis: #7d8a96;
+      --blue: #2f6fed;
+      --green: #10a37f;
+      --amber: #f2a900;
+      --profit: #d14c32;
+      --bg: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f5f7fa;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+    }
+    .wrap {
+      width: min(1800px, calc(100vw - 32px));
+      margin: 24px auto;
+      background: var(--bg);
+      border: 1px solid #e5ebf2;
+      border-radius: 8px;
+      padding: 28px 30px 22px;
+      box-shadow: 0 10px 30px rgba(23, 33, 43, 0.07);
+    }
+    .head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 8px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+    .sub {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+    .legend {
+      display: flex;
+      gap: 22px;
+      align-items: center;
+      margin-top: 10px;
+      font-size: 15px;
+      white-space: nowrap;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .swatch {
+      width: 28px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    .chart-box {
+      position: relative;
+      width: 100%;
+      height: min(760px, calc(100vh - 190px));
+      min-height: 560px;
+    }
+    svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      overflow: visible;
+    }
+    .tooltip {
+      position: absolute;
+      pointer-events: none;
+      display: none;
+      min-width: 190px;
+      padding: 10px 12px;
+      border: 1px solid #d8e1eb;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 8px 24px rgba(23, 33, 43, 0.16);
+      font-size: 14px;
+      line-height: 1.55;
+      z-index: 5;
+    }
+    .tooltip .date {
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .tooltip .rev { color: var(--blue); font-weight: 700; }
+    .tooltip .profit { color: var(--profit); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="head">
+      <div>
+        <h1>日维度 Revenue & 毛利（aXhare）</h1>
+        <div class="sub">2026 Q3（7-9月）· aXhare 端口；鼠标悬停任意日期查看 Revenue、Payout、毛利；毛利 = Revenue - Payout</div>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background: var(--blue)"></i>Revenue</span>
+        <span><i class="swatch" style="background: var(--profit)"></i>毛利</span>
+        <span><i class="swatch" style="background: var(--amber)"></i>首次突破节点</span>
+      </div>
+    </div>
+    <div id="chartBox" class="chart-box">
+      <svg id="chart" role="img" aria-label="日维度 Revenue 与毛利交互图"></svg>
+      <div id="tooltip" class="tooltip"></div>
+    </div>
+  </main>
+  <script>
+    const data = [{"date": "2026-07-01", "label": "7/1", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-02", "label": "7/2", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-03", "label": "7/3", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-04", "label": "7/4", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-05", "label": "7/5", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-06", "label": "7/6", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-07", "label": "7/7", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-08", "label": "7/8", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-09", "label": "7/9", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-10", "label": "7/10", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-11", "label": "7/11", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-12", "label": "7/12", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-13", "label": "7/13", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-14", "label": "7/14", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-15", "label": "7/15", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-16", "label": "7/16", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-17", "label": "7/17", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-18", "label": "7/18", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-19", "label": "7/19", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-20", "label": "7/20", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-21", "label": "7/21", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-22", "label": "7/22", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-23", "label": "7/23", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-24", "label": "7/24", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-25", "label": "7/25", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-26", "label": "7/26", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-27", "label": "7/27", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-28", "label": "7/28", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-29", "label": "7/29", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-30", "label": "7/30", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-07-31", "label": "7/31", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-08-01", "label": "8/1", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-08-02", "label": "8/2", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-08-03", "label": "8/3", "revenue": 0.01, "payout": 0.01, "profit": 0.0}, {"date": "2026-08-04", "label": "8/4", "revenue": 0.0, "payout": 0.01, "profit": -0.01}, {"date": "2026-08-05", "label": "8/5", "revenue": 0.0, "payout": 0.0, "profit": 0.0}, {"date": "2026-08-06", "label": "8/6", "revenue": 45.76, "payout": 36.63, "profit": 9.13}, {"date": "2026-08-07", "label": "8/7", "revenue": 82.28, "payout": 65.85, "profit": 16.43}, {"date": "2026-08-08", "label": "8/8", "revenue": 58.3, "payout": 46.64, "profit": 11.66}, {"date": "2026-08-09", "label": "8/9", "revenue": 59.18, "payout": 47.3, "profit": 11.88}, {"date": "2026-08-10", "label": "8/10", "revenue": 105.55, "payout": 84.46, "profit": 21.09}, {"date": "2026-08-11", "label": "8/11", "revenue": 96.26, "payout": 77.06, "profit": 19.2}, {"date": "2026-08-12", "label": "8/12", "revenue": 117.77, "payout": 93.71, "profit": 24.06}, {"date": "2026-08-13", "label": "8/13", "revenue": 178.97, "payout": 143.41, "profit": 35.56}, {"date": "2026-08-14", "label": "8/14", "revenue": 76.65, "payout": 60.6, "profit": 16.05}, {"date": "2026-08-15", "label": "8/15", "revenue": 94.72, "payout": 75.27, "profit": 19.45}, {"date": "2026-08-16", "label": "8/16", "revenue": 72.42, "payout": 57.83, "profit": 14.59}, {"date": "2026-08-17", "label": "8/17", "revenue": 91.96, "payout": 73.61, "profit": 18.35}, {"date": "2026-08-18", "label": "8/18", "revenue": 102.99, "payout": 81.4, "profit": 21.59}, {"date": "2026-08-19", "label": "8/19", "revenue": 53.23, "payout": 42.89, "profit": 10.34}, {"date": "2026-08-20", "label": "8/20", "revenue": 115.52, "payout": 109.29, "profit": 6.23}, {"date": "2026-08-21", "label": "8/21", "revenue": 85.53, "payout": 82.52, "profit": 3.01}, {"date": "2026-08-22", "label": "8/22", "revenue": 78.96, "payout": 63.41, "profit": 15.55}, {"date": "2026-08-23", "label": "8/23", "revenue": 92.63, "payout": 74.5, "profit": 18.13}, {"date": "2026-08-24", "label": "8/24", "revenue": 118.52, "payout": 95.45, "profit": 23.07}, {"date": "2026-08-25", "label": "8/25", "revenue": 143.45, "payout": 114.74, "profit": 28.71}, {"date": "2026-08-26", "label": "8/26", "revenue": 159.75, "payout": 127.96, "profit": 31.79}, {"date": "2026-08-27", "label": "8/27", "revenue": 162.39, "payout": 129.48, "profit": 32.91}, {"date": "2026-08-28", "label": "8/28", "revenue": 133.07, "payout": 106.7, "profit": 26.37}, {"date": "2026-08-29", "label": "8/29", "revenue": 132.72, "payout": 106.59, "profit": 26.13}, {"date": "2026-08-30", "label": "8/30", "revenue": 138.91, "payout": 111.38, "profit": 27.53}, {"date": "2026-08-31", "label": "8/31", "revenue": 133.11, "payout": 107.13, "profit": 25.98}, {"date": "2026-09-01", "label": "9/1", "revenue": 253.77, "payout": 198.37, "profit": 55.4}, {"date": "2026-09-02", "label": "9/2", "revenue": 258.11, "payout": 204.71, "profit": 53.4}, {"date": "2026-09-03", "label": "9/3", "revenue": 214.99, "payout": 166.61, "profit": 48.38}, {"date": "2026-09-04", "label": "9/4", "revenue": 224.08, "payout": 174.18, "profit": 49.9}, {"date": "2026-09-05", "label": "9/5", "revenue": 248.07, "payout": 190.79, "profit": 57.28}, {"date": "2026-09-06", "label": "9/6", "revenue": 156.51, "payout": 120.24, "profit": 36.27}, {"date": "2026-09-07", "label": "9/7", "revenue": 246.51, "payout": 189.08, "profit": 57.43}, {"date": "2026-09-08", "label": "9/8", "revenue": 198.04, "payout": 153.06, "profit": 44.98}, {"date": "2026-09-09", "label": "9/9", "revenue": 236.63, "payout": 187.78, "profit": 48.85}, {"date": "2026-09-10", "label": "9/10", "revenue": 221.08, "payout": 173.48, "profit": 47.6}, {"date": "2026-09-11", "label": "9/11", "revenue": 207.24, "payout": 162.8, "profit": 44.44}, {"date": "2026-09-12", "label": "9/12", "revenue": 220.89, "payout": 173.82, "profit": 47.07}, {"date": "2026-09-13", "label": "9/13", "revenue": 188.54, "payout": 148.49, "profit": 40.05}, {"date": "2026-09-14", "label": "9/14", "revenue": 172.91, "payout": 136.27, "profit": 36.64}, {"date": "2026-09-15", "label": "9/15", "revenue": 319.76, "payout": 253.07, "profit": 66.69}, {"date": "2026-09-16", "label": "9/16", "revenue": 375.41, "payout": 295.31, "profit": 80.1}, {"date": "2026-09-17", "label": "9/17", "revenue": 351.72, "payout": 275.12, "profit": 76.6}, {"date": "2026-09-18", "label": "9/18", "revenue": 367.88, "payout": 286.68, "profit": 81.2}, {"date": "2026-09-19", "label": "9/19", "revenue": 391.97, "payout": 303.0, "profit": 88.97}, {"date": "2026-09-20", "label": "9/20", "revenue": 275.65, "payout": 214.17, "profit": 61.48}, {"date": "2026-09-21", "label": "9/21", "revenue": 357.64, "payout": 277.8, "profit": 79.84}, {"date": "2026-09-22", "label": "9/22", "revenue": 306.94, "payout": 240.69, "profit": 66.25}, {"date": "2026-09-23", "label": "9/23", "revenue": 409.85, "payout": 318.31, "profit": 91.54}, {"date": "2026-09-24", "label": "9/24", "revenue": 275.82, "payout": 211.64, "profit": 64.18}, {"date": "2026-09-25", "label": "9/25", "revenue": 310.69, "payout": 239.65, "profit": 71.04}, {"date": "2026-09-26", "label": "9/26", "revenue": 301.58, "payout": 228.53, "profit": 73.05}, {"date": "2026-09-27", "label": "9/27", "revenue": 338.36, "payout": 258.86, "profit": 79.5}, {"date": "2026-09-28", "label": "9/28", "revenue": 320.62, "payout": 245.01, "profit": 75.61}, {"date": "2026-09-29", "label": "9/29", "revenue": 315.63, "payout": 240.97, "profit": 74.66}, {"date": "2026-09-30", "label": "9/30", "revenue": 542.89, "payout": 410.1, "profit": 132.79}];
+    const thresholdDates = new Set(["2026-08-07", "2026-08-13", "2026-09-01", "2026-09-15", "2026-09-23", "2026-09-30"]);
+    const colors = {
+      ink: "#17212b",
+      muted: "#617080",
+      grid: "#dde5ec",
+      axis: "#7d8a96",
+      blue: "#2f6fed",
+      green: "#10a37f",
+      amber: "#f2a900",
+      profit: "#d14c32"
+    };
+    const svg = document.getElementById("chart");
+    const box = document.getElementById("chartBox");
+    const tooltip = document.getElementById("tooltip");
+
+    function money(value) {
+      return Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function shortMoney(value) {
+      return Number(value).toLocaleString("en-US", { maximumFractionDigits: 0 });
+    }
+
+    function create(tag, attrs = {}, parent = svg) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
+      parent.appendChild(el);
+      return el;
+    }
+
+    function linePath(points) {
+      return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+    }
+
+    function render() {
+      svg.innerHTML = "";
+      const rect = box.getBoundingClientRect();
+      const width = Math.max(1100, rect.width);
+      const height = Math.max(560, rect.height);
+      const pad = { left: 82, right: 34, top: 34, bottom: 72 };
+      const chartW = width - pad.left - pad.right;
+      const chartH = height - pad.top - pad.bottom;
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+      const maxRevenue = Math.max(...data.map(d => d.revenue));
+      const yMax = Math.ceil(maxRevenue / 500) * 500;
+      const start = new Date(data[0].date);
+      const end = new Date(data[data.length - 1].date);
+      const totalMs = end - start || 1;
+      const x = d => pad.left + ((new Date(d.date) - start) / totalMs) * chartW;
+      const y = value => pad.top + chartH - (value / yMax) * chartH;
+
+      for (let value = 0; value <= yMax; value += yMax / 5) {
+        const yy = y(value);
+        create("line", { x1: pad.left, y1: yy, x2: width - pad.right, y2: yy, stroke: colors.grid, "stroke-width": 1 });
+        create("text", { x: pad.left - 14, y: yy + 5, "text-anchor": "end", fill: colors.muted, "font-size": 14 })
+          .textContent = shortMoney(value);
+      }
+
+      create("line", { x1: pad.left, y1: pad.top, x2: pad.left, y2: height - pad.bottom, stroke: colors.axis, "stroke-width": 1.5 });
+      create("line", { x1: pad.left, y1: height - pad.bottom, x2: width - pad.right, y2: height - pad.bottom, stroke: colors.axis, "stroke-width": 1.5 });
+
+      const revenuePoints = data.map(d => ({ ...d, x: x(d), y: y(d.revenue) }));
+      const profitPoints = data.map(d => ({ ...d, x: x(d), y: y(d.profit) }));
+
+      create("path", { d: linePath(revenuePoints), fill: "none", stroke: colors.blue, "stroke-width": 3, "stroke-linejoin": "round" });
+      create("path", { d: linePath(profitPoints), fill: "none", stroke: colors.profit, "stroke-width": 3, "stroke-linejoin": "round" });
+
+      const tickEvery = 15;
+      data.forEach((d, i) => {
+        if (i % tickEvery !== 0 && i !== data.length - 1) return;
+        const xx = x(d);
+        create("line", { x1: xx, y1: height - pad.bottom, x2: xx, y2: height - pad.bottom + 7, stroke: colors.axis });
+        create("text", { x: xx, y: height - pad.bottom + 28, "text-anchor": "middle", fill: colors.ink, "font-size": 14 })
+          .textContent = d.label;
+      });
+
+      create("text", { x: 24, y: pad.top + chartH / 2, fill: colors.muted, "font-size": 15 }).textContent = "金额";
+      create("text", { x: pad.left + chartW / 2, y: height - 20, "text-anchor": "middle", fill: colors.muted, "font-size": 15 }).textContent = "日期";
+
+      revenuePoints.forEach(p => {
+        create("circle", { cx: p.x, cy: p.y, r: thresholdDates.has(p.date) ? 6 : 3, fill: thresholdDates.has(p.date) ? colors.amber : colors.green, stroke: "#fff", "stroke-width": thresholdDates.has(p.date) ? 2 : 0 });
+      });
+      profitPoints.forEach(p => {
+        create("circle", { cx: p.x, cy: p.y, r: 2.4, fill: colors.profit });
+      });
+
+      const occupiedLabels = [];
+      const overlaps = (a, b) => !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+      const thresholdPoints = revenuePoints.filter(p => thresholdDates.has(p.date));
+      thresholdPoints.forEach(p => {
+        const line1 = `${p.label}  Rev ${shortMoney(p.revenue)}`;
+        const line2 = `毛利 ${shortMoney(p.profit)}`;
+        const labelW = Math.max(118, Math.max(line1.length, line2.length) * 8 + 18);
+        const labelH = 42;
+        const candidates = [
+          { dx: -labelW - 14, dy: -52 },
+          { dx: 14, dy: -52 },
+          { dx: -labelW - 14, dy: 18 },
+          { dx: 14, dy: 18 },
+          { dx: -labelW / 2, dy: -72 },
+          { dx: -labelW / 2, dy: 36 }
+        ];
+        let box = null;
+        for (const candidate of candidates) {
+          const x0 = Math.max(pad.left, Math.min(width - pad.right - labelW, p.x + candidate.dx));
+          const y0 = Math.max(pad.top + 6, Math.min(height - pad.bottom - labelH - 8, p.y + candidate.dy));
+          const proposed = { x: x0, y: y0, w: labelW, h: labelH };
+          if (!occupiedLabels.some(existing => overlaps(proposed, existing))) {
+            box = proposed;
+            break;
+          }
+        }
+        if (!box) {
+          box = {
+            x: Math.max(pad.left, Math.min(width - pad.right - labelW, p.x - labelW / 2)),
+            y: Math.max(pad.top + 6, Math.min(height - pad.bottom - labelH - 8, p.y - 58)),
+            w: labelW,
+            h: labelH
+          };
+        }
+        occupiedLabels.push(box);
+        const anchorX = Math.max(box.x, Math.min(box.x + box.w, p.x));
+        const anchorY = p.y > box.y + box.h ? box.y + box.h : box.y;
+        create("line", { x1: p.x, y1: p.y, x2: anchorX, y2: anchorY, stroke: colors.amber, "stroke-width": 1 });
+        create("rect", { x: box.x, y: box.y, width: box.w, height: box.h, rx: 6, fill: "#fff", stroke: colors.grid, "stroke-width": 1 });
+        create("text", { x: box.x + 9, y: box.y + 17, fill: colors.ink, "font-size": 13, "font-weight": 700 }).textContent = line1;
+        create("text", { x: box.x + 9, y: box.y + 34, fill: colors.profit, "font-size": 13, "font-weight": 700 }).textContent = line2;
+      });
+
+      revenuePoints.forEach((p, i) => {
+        const hitW = Math.max(10, chartW / data.length);
+        const hit = create("rect", {
+          x: p.x - hitW / 2,
+          y: pad.top,
+          width: hitW,
+          height: chartH,
+          fill: "transparent",
+          style: "cursor: crosshair"
+        });
+        hit.addEventListener("mouseenter", () => showTip(p));
+        hit.addEventListener("mousemove", event => moveTip(event, p));
+        hit.addEventListener("mouseleave", hideTip);
+      });
+
+      let guide = null;
+      function showGuide(p) {
+        if (guide) guide.remove();
+        guide = create("line", { x1: p.x, y1: pad.top, x2: p.x, y2: height - pad.bottom, stroke: colors.axis, "stroke-width": 1, "stroke-dasharray": "4 4", opacity: 0.8 });
+      }
+
+      function showTip(p) {
+        showGuide(p);
+        tooltip.style.display = "block";
+        tooltip.innerHTML = `
+          <div class="date">${p.date}</div>
+          <div class="rev">Revenue：${money(p.revenue)}</div>
+          <div>Payout：${money(p.payout)}</div>
+          <div class="profit">毛利：${money(p.profit)}</div>
+        `;
+      }
+
+      function moveTip(event, p) {
+        showTip(p);
+        const bounds = box.getBoundingClientRect();
+        const tipW = tooltip.offsetWidth;
+        const tipH = tooltip.offsetHeight;
+        let left = event.clientX - bounds.left + 16;
+        let top = event.clientY - bounds.top - tipH - 14;
+        if (left + tipW > bounds.width) left = event.clientX - bounds.left - tipW - 16;
+        if (top < 0) top = event.clientY - bounds.top + 18;
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+      }
+
+      function hideTip() {
+        tooltip.style.display = "none";
+        if (guide) {
+          guide.remove();
+          guide = null;
+        }
+      }
+    }
+
+    render();
+    window.addEventListener("resize", render);
+  </script>
+</body>
+</html>
